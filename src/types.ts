@@ -1,0 +1,116 @@
+export type WeatherModelId = 
+  | 'weathernext3' 
+  | 'ecmwf_aifs' 
+  | 'graphcast' 
+  | 'pangu_weather' 
+  | 'ai_consensus';
+
+export type WeatherVariable = 'temperature' | 'precipitation' | 'wind_speed';
+
+export interface LocationItem {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  elevation?: number;
+  country: string;
+  countryCode: string;
+  admin1?: string;
+  admin2?: string;
+  timezone?: string;
+}
+
+export interface HourlyModelSeries {
+  temperature: number[];
+  precipitation: number[];
+  precipitation_probability: number[];
+  wind_speed: number[];
+  wind_direction: number[];
+}
+
+export interface ModelInfo {
+  id: WeatherModelId;
+  name: string;
+  developer: string;
+  architecture: string;
+  badge: string;
+  isLive: boolean;
+  color: string;
+  hourly: HourlyModelSeries;
+}
+
+export interface HourlyDetailPoint {
+  time: string;
+  temp: number;
+  precip: number;
+  wind: number;
+  code: number;
+}
+
+export interface DayForecast {
+  date: string;
+  dayName: string;
+  dayFormatted: string;
+  isToday: boolean;
+  tempMax: number;
+  tempMin: number;
+  precipitationSum: number;
+  precipitationProbability: number;
+  windSpeedMax: number;
+  weatherCode: number;
+  hourly: HourlyDetailPoint[];
+}
+
+export interface CurrentWeather {
+  temperature: number;
+  feelsLike: number;
+  windSpeed: number;
+  windDirection: number;
+  precipitation: number;
+  humidity: number;
+  weatherCode: number;
+}
+
+export interface ForecastResponse {
+  meta: {
+    latitude: number;
+    longitude: number;
+    elevation?: number;
+    timezone: string;
+    generatedAt: string;
+    isWeatherNextLive: boolean;
+  };
+  current: CurrentWeather;
+  times: string[];
+  models: Record<WeatherModelId, ModelInfo>;
+  sevenDayForecast: DayForecast[];
+}
+
+export interface StationHourly {
+  temp: number[];
+  precip: number[];
+  wind: number[];
+}
+
+export interface SpainStation {
+  id: number;
+  name: string;
+  admin: string;
+  lat: number;
+  lon: number;
+  weatherCodes: number[];
+  models: Record<WeatherModelId, StationHourly>;
+}
+
+export interface HeatmapPoint {
+  x: number;
+  y: number;
+  value: number;
+}
+
+export interface SpainOverviewResponse {
+  times: string[];
+  stations: SpainStation[];
+  generatedAt: string;
+}
+
