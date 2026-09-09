@@ -5,8 +5,7 @@ import { WeatherMap } from './components/WeatherMap';
 import { ForecastDrawer } from './components/ForecastDrawer';
 import { TimelineBar } from './components/TimelineBar';
 import { ModelInfoModal } from './components/ModelInfoModal';
-import { SettingsModal } from './components/SettingsModal';
-import { getForecast, getSpainOverview, checkHealth } from './services/weatherApi';
+import { getForecast, getSpainOverview } from './services/weatherApi';
 import {
   LocationItem,
   ForecastResponse,
@@ -23,6 +22,7 @@ import {
   Calendar,
   Eye,
   EyeOff,
+  Radar,
 } from 'lucide-react';
 
 const DEFAULT_LOCATION: LocationItem = {
@@ -42,22 +42,21 @@ export const App: React.FC = () => {
   const [spainStations, setSpainStations] = useState<SpainStation[]>([]);
   const [timelineTimes, setTimelineTimes] = useState<string[]>([]);
   const [currentHourIndex, setCurrentHourIndex] = useState<number>(0);
-  const [activeModel, setActiveModel] = useState<WeatherModelId>('weathernext3');
+  const [activeModel, setActiveModel] = useState<WeatherModelId>('ecmwf_aifs');
   const [activeVariable, setActiveVariable] = useState<WeatherVariable>('temperature');
 
   const [loadingForecast, setLoadingForecast] = useState<boolean>(false);
   const [overviewLoading, setOverviewLoading] = useState<boolean>(true);
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
-  const [isWeatherNextLive, setIsWeatherNextLive] = useState<boolean>(false);
   
   // Map overlay controls
   const [overlayVisible, setOverlayVisible] = useState<boolean>(true);
-  const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
+const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
   const [showStations, setShowStations] = useState<boolean>(true);
   const [showWindParticles, setShowWindParticles] = useState<boolean>(true);
+  const [showRadar, setShowRadar] = useState<boolean>(false);
   const [showLayerControl, setShowLayerControl] = useState(false);
 
   // Load Spain overview on mount
@@ -77,13 +76,7 @@ export const App: React.FC = () => {
       }
     };
 
-    const loadHealth = async () => {
-      const h = await checkHealth();
-      setIsWeatherNextLive(Boolean(h.googleApiConfigured));
-    };
-
     loadOverview();
-    loadHealth();
   }, []);
 
   // Fetch forecast for currently selected point
@@ -92,7 +85,6 @@ export const App: React.FC = () => {
     try {
       const data = await getForecast(loc.latitude, loc.longitude);
       setForecastData(data);
-      setIsWeatherNextLive(data.meta.isWeatherNextLive);
       if (!timelineTimes.length && data.times) {
         setTimelineTimes(data.times);
       }
@@ -151,11 +143,7 @@ export const App: React.FC = () => {
       </div>
 
       {/* Top Header */}
-      <Header
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenInfo={() => setIsInfoOpen(true)}
-        isWeatherNextLive={isWeatherNextLive}
-      />
+      <Header onOpenInfo={() => setIsInfoOpen(true)} />
 
       {/* Floating Control Bar over the Map */}
       <div className="relative flex-1 min-h-0 w-full overflow-hidden">
@@ -265,7 +253,7 @@ export const App: React.FC = () => {
                   >
                     <span>Ver estaciones</span>
                     {showStations ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
-                  </button>
+</button>
                   <button
                     onClick={() => setShowWindParticles(prev => !prev)}
                     aria-pressed={showWindParticles}
@@ -276,6 +264,17 @@ export const App: React.FC = () => {
                       <span>Viento animado (Windy)</span>
                     </span>
                     {showWindParticles ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
+                  </button>
+                  <button
+                    onClick={() => setShowRadar(prev => !prev)}
+                    aria-pressed={showRadar}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-all"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Radar className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Radar de lluvia (observación)</span>
+                    </span>
+                    {showRadar ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
                   </button>
                 </div>
               </div>
@@ -302,11 +301,8 @@ export const App: React.FC = () => {
             </span>
 
             {[
-              { id: 'weathernext3', label: 'WeatherNext 3', color: '#3b82f6' },
-              { id: 'ecmwf_aifs', label: 'AIFS', color: '#10b981' },
-              { id: 'graphcast', label: 'GraphCast', color: '#8b5cf6' },
-              { id: 'pangu_weather', label: 'Pangu', color: '#f59e0b' },
-              { id: 'ai_consensus', label: 'Consenso', color: '#06b6d4' },
+              { id: 'ecmwf_aifs', label: 'AIFS ECMWF', color: '#10b981' },
+              { id: 'ncep_aigfs', label: 'AIGFS NOAA', color: '#8b5cf6' },
             ].map((m) => {
               const isSelected = activeModel === m.id;
               return (
@@ -336,9 +332,10 @@ export const App: React.FC = () => {
           hourIndex={currentHourIndex}
           currentLocation={currentLocation}
           overlayVisible={overlayVisible}
-          overlayOpacity={overlayOpacity}
+overlayOpacity={overlayOpacity}
           showStations={showStations}
           showWindParticles={showWindParticles}
+          showRadar={showRadar}
           overviewLoading={overviewLoading}
           overviewError={overviewError}
           selectedTime={timelineTimes[currentHourIndex]}
@@ -378,15 +375,6 @@ export const App: React.FC = () => {
 
       {/* Modals */}
       <ModelInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        isWeatherNextLive={isWeatherNextLive}
-        onApiKeySaved={() => {
-          checkHealth().then((h) => setIsWeatherNextLive(Boolean(h.googleApiConfigured)));
-          fetchForecast(currentLocation);
-        }}
-      />
     </div>
   );
 };

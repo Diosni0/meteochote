@@ -256,10 +256,10 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
 
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/60 overflow-hidden divide-y divide-slate-800 backdrop-blur-sm">
                   {Object.values(forecastData.models).map((m) => {
-                    const next24Temps = m.hourly.temperature.slice(0, 24);
-                    const next24Precip = m.hourly.precipitation.slice(0, 24);
-                    const maxT = Math.max(...next24Temps);
-                    const minT = Math.min(...next24Temps);
+                    const next24Temps = m.hourly.temperature.slice(0, 24).filter((v) => Number.isFinite(v));
+                    const next24Precip = m.hourly.precipitation.slice(0, 24).filter((v) => Number.isFinite(v));
+                    const maxT = next24Temps.length ? Math.max(...next24Temps) : null;
+                    const minT = next24Temps.length ? Math.min(...next24Temps) : null;
                     const sumP = Number(next24Precip.reduce((a, b) => a + b, 0).toFixed(1));
 
                     return (
@@ -274,7 +274,7 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
 
                         <div className="text-right font-mono">
                           <div className="text-white font-bold bg-gradient-to-r from-slate-300 to-slate-400 bg-clip-text text-transparent">
-                            {minT}° a {maxT}°C
+                            {maxT !== null ? `${minT}° a ${maxT}°C` : 'Sin datos'}
                           </div>
                           <div className="text-[10px] text-blue-400">
                             {sumP > 0 ? `${sumP} mm lluvia` : 'Sin lluvia'}
@@ -288,10 +288,12 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
                 <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-950/30 to-indigo-950/30 border border-blue-500/20 backdrop-blur-sm">
                   <div className="font-semibold text-blue-300 flex items-center gap-2 mb-1.5">
                     <Sparkles className="w-4 h-4 text-blue-400" />
-                    <span>Consenso de Inteligencia Artificial</span>
+                    <span>Acuerdo entre modelos IA</span>
                   </div>
                   <p className="text-[11px] text-slate-300">
-                    Las redes neuronales muestran una concordancia alta (&gt;90%) en la evolución térmica de esta zona.
+                    AIFS y AIGFS son redes neuronales independientes entrenadas con datos de
+                    reanálisis ERA5. Cuanto más coinciden, mayor confianza en la previsión; si
+                    divergen, hay incertidumbre atmosférica.
                   </p>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Cpu, Zap, Globe, Shield, Sparkles } from 'lucide-react';
+import { X, Cpu, Zap, Sparkles } from 'lucide-react';
 
 interface ModelInfoModalProps {
   isOpen: boolean;
@@ -24,66 +24,66 @@ export const ModelInfoModal: React.FC<ModelInfoModalProps> = ({ isOpen, onClose 
             <Sparkles className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">Modelos Meteorológicos de IA</h2>
+            <h2 className="text-xl font-bold text-white">Modelos Meteorológicos de IA (reales)</h2>
             <p className="text-xs text-slate-400">
-              La revolución del aprendizaje profundo frente a la predicción numérica clásica
+              Previsiones reales de redes neuronales operativas, servidas vía Open-Meteo
             </p>
           </div>
         </div>
 
         <div className="space-y-4 text-xs text-slate-300">
-          {/* WeatherNext 3 */}
-          <div className="p-4 rounded-2xl bg-blue-950/30 border border-blue-500/30">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="font-bold text-sm text-blue-300">Google DeepMind WeatherNext 3</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-semibold">Sept 2026</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed">
-              El modelo meteorológico global más reciente de DeepMind. Se entrena asimilando directamente observaciones de satélite en tiempo real, resolviendo con precisión horaria eventos locales rápidos como tormentas convectivas y cambios bruscos de temperatura en España.
-            </p>
-          </div>
-
           {/* ECMWF AIFS */}
           <div className="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-500/30">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="font-bold text-sm text-emerald-300">ECMWF AIFS (Centro Europeo)</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold">ECMWF AI</span>
+              <span className="font-bold text-sm text-emerald-300">ECMWF AIFS 0.25°</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold">ECMWF AIFS</span>
             </div>
             <p className="text-slate-300 leading-relaxed">
-              Sistema de previsión por IA desarrollado por el Centro Europeo (ECMWF). Ha demostrado superar al modelo físico tradicional IFS en predicciones de 3 a 15 días con una reducción drástica del coste computacional.
+              Sistema de previsión por IA del Centro Europeo de Predicción a Medio Plazo (ECMWF).
+              Red neuronal entrenada con datos de reanálisis ERA5; ha demostrado superar al modelo
+              físico IFS en numerosas variables y plazos con una fracción del coste computacional.
+              Resolución de 25 km, actualizado cada 6 horas con 7 días de horizonte.
             </p>
           </div>
 
-          {/* GraphCast */}
+          {/* NOAA AIGFS */}
           <div className="p-4 rounded-2xl bg-purple-950/30 border border-purple-500/30">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="font-bold text-sm text-purple-300">Google DeepMind GraphCast</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 font-semibold">GNN Mesh</span>
+              <span className="font-bold text-sm text-purple-300">NOAA AIGFS 0.25°</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 font-semibold">NOAA AIGFS</span>
             </div>
             <p className="text-slate-300 leading-relaxed">
-              Utiliza redes neuronales sobre grafos (GNN) en una malla icosaédrica tridimensional del globo terráqueo. Genera previsiones completas a 10 días en menos de un minuto con gran fiabilidad en el seguimiento de ciclones y danas.
+              Sistema global de previsión basado en IA de NOAA (EE. UU.), construido sobre la
+              arquitectura GraphCast de Google DeepMind: redes neuronales sobre grafos en una malla
+              icosaédrica del globo. Resolución de 25 km, actualizado cada 6 horas.
             </p>
           </div>
 
-          {/* Pangu-Weather */}
-          <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="font-bold text-sm text-amber-300">Huawei Pangu-Weather</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-semibold">3D Vision Transformer</span>
+          {/* Data source callout */}
+          <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700">
+            <div className="font-semibold text-white text-xs mb-1 flex items-center gap-1.5">
+              <Cpu className="w-3.5 h-3.5 text-blue-400" />
+              <span>De dónde salen los datos</span>
             </div>
-            <p className="text-slate-300 leading-relaxed">
-              Arquitectura de transformador visual en 3D adaptada a la atmósfera. Destaca en la predicción de trayectorias frontales y campos de presión en capas altas y bajas de la troposfera.
+            <p className="text-slate-400 leading-relaxed text-[11px]">
+              Ambos modelos se consultan en directo contra la API gratuita de Open-Meteo, sin clave
+              ni registro. Los mapas del panel son interpolaciones de 39 puntos de referencia
+              (península, Baleares y Canarias); no son radares. Cuando los dos modelos divergen,
+              la incertidumbre de la previsión es mayor: compáralos en la pestaña «Comparativa IA».
             </p>
           </div>
 
-          {/* Legacy NWP vs AI callout */}
+          {/* Why AI models */}
           <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700">
             <div className="font-semibold text-white text-xs mb-1 flex items-center gap-1.5">
               <Zap className="w-3.5 h-3.5 text-yellow-400" />
-              <span>¿Por qué descartamos los modelos clásicos?</span>
+              <span>¿Por qué modelos de IA?</span>
             </div>
             <p className="text-slate-400 leading-relaxed text-[11px]">
-              Los modelos numéricos clásicos resuelven ecuaciones diferenciales complejas en supercomputadores durante horas. Los modelos de IA aprenden de décadas de física atmosférica histórica, ejecutan inferencias en segundos y han demostrado mayor acierto en variables clave a medio plazo.
+              Los modelos numéricos clásicos resuelven ecuaciones diferenciales complejas en
+              supercomputadores durante horas. Los modelos de IA aprenden de décadas de física
+              atmosférica histórica, ejecutan inferencias en segundos y han demostrado mayor acierto
+              en variables clave a medio plazo.
             </p>
           </div>
         </div>

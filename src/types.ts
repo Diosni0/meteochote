@@ -1,9 +1,6 @@
-export type WeatherModelId = 
-  | 'weathernext3' 
-  | 'ecmwf_aifs' 
-  | 'graphcast' 
-  | 'pangu_weather' 
-  | 'ai_consensus';
+export type WeatherModelId =
+  | 'ecmwf_aifs'
+  | 'ncep_aigfs';
 
 export type WeatherVariable = 'temperature' | 'precipitation' | 'wind_speed';
 
@@ -78,7 +75,6 @@ export interface ForecastResponse {
     elevation?: number;
     timezone: string;
     generatedAt: string;
-    isWeatherNextLive: boolean;
   };
   current: CurrentWeather;
   times: string[];

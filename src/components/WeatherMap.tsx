@@ -7,7 +7,9 @@ import { MapPin } from 'lucide-react';
 import { useHeatmapData } from '../hooks/useHeatmapData';
 import { HeatmapLayer } from './HeatmapLayer';
 import { WindParticlesLayer } from './WindParticlesLayer';
+import { RadarLayer } from './RadarLayer';
 import { WEATHER_SCALES } from '../services/weatherLayers';
+import { Radar } from 'lucide-react';
 
 interface WeatherMapProps {
   stations: SpainStation[];
@@ -19,6 +21,8 @@ interface WeatherMapProps {
   overlayOpacity: number;
   showStations: boolean;
   showWindParticles?: boolean;
+  showRadar?: boolean;
+  radarOpacity?: number;
   overviewLoading: boolean;
   overviewError: string | null;
   selectedTime: string | undefined;
@@ -240,6 +244,8 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
   overlayOpacity,
   showStations,
   showWindParticles = true,
+  showRadar = false,
+  radarOpacity = 0.65,
   overviewLoading,
   overviewError,
   selectedTime,
@@ -329,7 +335,20 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
             ))}
           </div>
         </>}
-        {status ? <p role="status" className="mt-2 text-amber-300">{status}</p> : <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Interpolación continua IA · {heatmapData.length} estaciones<span className="hidden sm:inline"> · Corrientes de viento animadas (Windy)</span></p>}
+        {status ? <p role="status" className="mt-2 text-amber-300">{status}</p> : <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Interpolación de modelos IA reales (AIFS · AIGFS) · {heatmapData.length} estaciones<span className="hidden sm:inline"> · Corrientes de viento animadas</span></p>}
+        {showRadar && (
+          <div className="mt-2 border-t border-slate-700/70 pt-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-cyan-300">
+              <Radar className="w-3 h-3" />
+              <span>Radar observado (RainViewer) · última imagen</span>
+            </div>
+            <div className="h-2 rounded-full mt-2" style={{ background: 'linear-gradient(to right, #033366, #2563eb, #22d3ee, #22c55e, #facc15, #f97316, #dc2626)' }} />
+            <div className="flex justify-between text-[9px] text-slate-400 mt-0.5">
+              <span>Débil</span>
+              <span>Intenso</span>
+            </div>
+          </div>
+        )}
       </section>
 
       <MapContainer
@@ -350,6 +369,9 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
         />
         <FlyToCenter center={position} />
         <MapEventsHandler onSelectCoords={onSelectCoords} />
+
+        {/* Radar de observación (RainViewer) - debajo del gradiente IA */}
+        <RadarLayer visible={showRadar} opacity={radarOpacity} />
 
         {/* Render Station Markers based on layer visibility */}
         {showStations && <StationLayer

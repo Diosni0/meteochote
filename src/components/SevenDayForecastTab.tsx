@@ -25,10 +25,10 @@ export const SevenDayForecastTab: React.FC<SevenDayForecastTabProps> = ({ foreca
         <div>
           <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
             <Calendar className="w-4 h-4 text-blue-400" />
-            <span>Previsión a 7 Días (Consenso de IA)</span>
+            <span>Previsión a 7 Días</span>
           </h3>
           <p className="text-xs text-slate-400">
-            Proyección multivariable calculada mediante redes neuronales meteorológicas
+            Agregados diarios del modelo base (best match) con desglose horario
           </p>
         </div>
         <div className="text-xs text-slate-400 font-medium">

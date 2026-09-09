@@ -43,77 +43,30 @@ const SPAIN_STATIONS = [
   { id: 39, name: 'Lanzarote', admin: 'Canarias', lat: 28.9630, lon: -13.5477 },
 ];
 
-function computeAIModels(baseTemps, basePrecip, basePrecipProb, baseWind, baseWindDir) {
-  const count = baseTemps.length;
-  const weathernext3 = { temp: [], precip: [], wind: [] };
-  const ecmwf_aifs = { temp: [], precip: [], wind: [] };
-  const graphcast = { temp: [], precip: [], wind: [] };
-  const pangu = { temp: [], precip: [], wind: [] };
-  const consensus = { temp: [], precip: [], wind: [] };
+// Real AI models available on Open-Meteo (free for non-commercial use, no API key)
+const AI_MODELS = [
+  { id: 'ecmwf_aifs', om: 'ecmwf_aifs025_single', name: 'ECMWF AIFS 0.25°', developer: 'Centro Europeo (ECMWF)', architecture: 'Artificial Intelligence Forecasting System (single run)', badge: 'ECMWF AIFS', color: '#10b981' },
+  { id: 'ncep_aigfs', om: 'ncep_aigfs025', name: 'NCEP AIGFS 0.25°', developer: 'NOAA (basado en GraphCast)', architecture: 'AI Global Forecast System (GraphCast-derived)', badge: 'NOAA AIGFS', color: '#8b5cf6' },
+];
 
-  for (let i = 0; i < count; i++) {
-    const hourOfDay = i % 24;
-    const bT = baseTemps[i] ?? 20;
-    const bP = basePrecip[i] ?? 0;
-    const bW = baseWind[i] ?? 10;
-    const bProb = basePrecipProb[i] ?? 0;
+const MODELS_PARAM = ['best_match', ...AI_MODELS.map((m) => m.om)].join(',');
+const HOURLY_VARS = 'temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code';
+const DAILY_VARS = 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max';
 
-    const wn3T = Number((bT + 0.35 * Math.sin(((hourOfDay - 14) * Math.PI) / 12)).toFixed(1));
-    const wn3P = bP > 0 ? Number((bP * (1 + 0.25 * Math.sin(i * 0.7))).toFixed(1)) : (bProb > 45 && hourOfDay > 13 && hourOfDay < 19 ? 0.2 : 0);
-    const wn3W = Number(Math.max(1, bW + 1.2 * Math.sin(i * 0.5)).toFixed(1));
+const series = (hourly, variable, omModel) => {
+  if (!hourly) return [];
+  const direct = omModel ? hourly[`${variable}_${omModel}`] : (hourly[variable] ?? hourly[`${variable}_best_match`]);
+  return Array.isArray(direct) ? direct : [];
+};
 
-    const aifsT = Number((bT - 0.25 * Math.cos((hourOfDay * Math.PI) / 12)).toFixed(1));
-    const aifsP = bP > 0 ? Number((bP * 0.95).toFixed(1)) : 0;
-    const aifsW = Number(Math.max(1, bW - 0.4 + 0.5 * Math.cos(i * 0.3)).toFixed(1));
+const num = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 
-    const gcT = Number((bT + 0.15 * Math.sin(i * 0.15)).toFixed(1));
-    const gcP = bP > 0 ? Number((bP * 0.9).toFixed(1)) : 0;
-    const gcW = Number(Math.max(1, bW + 0.8 * Math.cos(i * 0.4)).toFixed(1));
-
-    const pgT = Number((bT + 0.4 * Math.sin((hourOfDay * Math.PI) / 8)).toFixed(1));
-    const pgP = bP > 0 ? Number((bP * 1.1).toFixed(1)) : 0;
-    const pgW = Number(Math.max(1, bW + 1.5 * Math.sin(i * 0.6)).toFixed(1));
-
-    const cT = Number(((wn3T + aifsT + gcT + pgT) / 4).toFixed(1));
-    const cP = Number(((wn3P + aifsP + gcP + pgP) / 4).toFixed(1));
-    const cW = Number(((wn3W + aifsW + gcW + pgW) / 4).toFixed(1));
-
-    weathernext3.temp.push(wn3T);
-    weathernext3.precip.push(wn3P);
-    weathernext3.wind.push(wn3W);
-
-    ecmwf_aifs.temp.push(aifsT);
-    ecmwf_aifs.precip.push(aifsP);
-    ecmwf_aifs.wind.push(aifsW);
-
-    graphcast.temp.push(gcT);
-    graphcast.precip.push(gcP);
-    graphcast.wind.push(gcW);
-
-    pangu.temp.push(pgT);
-    pangu.precip.push(pgP);
-    pangu.wind.push(pgW);
-
-    consensus.temp.push(cT);
-    consensus.precip.push(cP);
-    consensus.wind.push(cW);
-  }
-
-  return {
-    weathernext3,
-    ecmwf_aifs,
-    graphcast,
-    pangu_weather: pangu,
-    ai_consensus: consensus,
-  };
-}
-
+// Warm-cache across invocations (best effort on serverless)
 let spainOverviewCache = null;
 let spainOverviewCacheTime = 0;
 const CACHE_TTL = 15 * 60 * 1000;
 
 export default async function handler(req, res) {
-  // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -129,7 +82,11 @@ export default async function handler(req, res) {
 
   try {
     if (pathname === '/health' || pathname === '') {
-      return res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+      return res.status(200).json({
+        status: 'ok',
+        models: AI_MODELS.map((m) => ({ id: m.id, name: m.name, source: 'open-meteo' })),
+        timestamp: new Date().toISOString(),
+      });
     }
 
     if (pathname === '/spain-overview') {
@@ -140,41 +97,30 @@ export default async function handler(req, res) {
       const lats = SPAIN_STATIONS.map((s) => s.lat).join(',');
       const lons = SPAIN_STATIONS.map((s) => s.lon).join(',');
 
-      const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=temperature_2m,precipitation,precipitation_probability,wind_speed_10m,wind_direction_10m,weather_code&forecast_days=7&timezone=Europe%2FMadrid`;
-      const response = await axios.get(apiUrl, { timeout: 10000 });
+      const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
+      const response = await axios.get(apiUrl, { timeout: 15000 });
       const dataList = Array.isArray(response.data) ? response.data : [response.data];
       const times = dataList[0]?.hourly?.time || [];
 
       const stations = SPAIN_STATIONS.map((station, idx) => {
-        const item = dataList[idx] || {};
-        const hourly = item.hourly || {};
-        const bTemps = hourly.temperature_2m || [];
-        const bPrecip = hourly.precipitation || [];
-        const bProb = hourly.precipitation_probability || [];
-        const bWind = hourly.wind_speed_10m || [];
-        const bWindDir = hourly.wind_direction_10m || [];
-        const bCodes = hourly.weather_code || [];
-
-        const aiModels = computeAIModels(bTemps, bPrecip, bProb, bWind, bWindDir);
-
+        const hourly = dataList[idx]?.hourly || {};
         return {
           id: station.id,
           name: station.name,
           admin: station.admin,
           lat: station.lat,
           lon: station.lon,
-          weatherCodes: bCodes,
-          windDirections: bWindDir,
-          models: aiModels,
+          weatherCodes: series(hourly, 'weather_code'),
+          windDirections: series(hourly, 'wind_direction_10m'),
+          models: Object.fromEntries(AI_MODELS.map((m) => [m.id, {
+            temp: series(hourly, 'temperature_2m', m.om),
+            precip: series(hourly, 'precipitation', m.om),
+            wind: series(hourly, 'wind_speed_10m', m.om),
+          }])),
         };
       });
 
-      const payload = {
-        times,
-        stations,
-        generatedAt: new Date().toISOString(),
-      };
-
+      const payload = { times, stations, generatedAt: new Date().toISOString() };
       spainOverviewCache = payload;
       spainOverviewCacheTime = Date.now();
       return res.status(200).json(payload);
@@ -188,72 +134,49 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Parámetros lat y lon numéricos requeridos' });
       }
 
-      const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,weather_code,surface_pressure&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&forecast_days=7&timezone=Europe%2FMadrid`;
-      const omRes = await axios.get(openMeteoUrl, { timeout: 8000 });
+      const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&daily=${DAILY_VARS}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,weather_code&models=${MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
+      const omRes = await axios.get(openMeteoUrl, { timeout: 12000 });
       const omData = omRes.data;
 
+      const baseTemp = series(omData.hourly, 'temperature_2m');
       const baseTimes = omData.hourly?.time || [];
-      const baseTemps = omData.hourly?.temperature_2m || [];
-      const basePrecip = omData.hourly?.precipitation || [];
-      const basePrecipProb = omData.hourly?.precipitation_probability || [];
-      const baseWind = omData.hourly?.wind_speed_10m || [];
-      const baseWindDir = omData.hourly?.wind_direction_10m || [];
-      const baseCodes = omData.hourly?.weather_code || [];
+      const basePrecip = series(omData.hourly, 'precipitation');
+      const baseWind = series(omData.hourly, 'wind_speed_10m');
+      const baseCodes = series(omData.hourly, 'weather_code');
+      const current = omData.current || {};
 
-      const aiModels = computeAIModels(baseTemps, basePrecip, basePrecipProb, baseWind, baseWindDir);
-
+      const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
       const dailyRaw = omData.daily || {};
       const dailyDates = dailyRaw.time || [];
+
       const sevenDayForecast = dailyDates.slice(0, 7).map((dateStr, idx) => {
         const dateObj = new Date(dateStr);
-        const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-        const dayName = dayNames[dateObj.getDay()];
-        const dayFormatted = `${dateObj.getDate()} de ${dateObj.toLocaleString('es-ES', { month: 'short' })}`;
-
         const startH = idx * 24;
         const endH = startH + 24;
-        const dayTemps = aiModels.ai_consensus.temp.slice(startH, endH);
-        const dayPrecip = aiModels.ai_consensus.precip.slice(startH, endH);
-        const dayWinds = aiModels.ai_consensus.wind.slice(startH, endH);
-        const dayTimes = baseTimes.slice(startH, endH);
-        const dayCodes = baseCodes.slice(startH, endH);
+        const dayTemps = baseTemp.slice(startH, endH).filter((v) => Number.isFinite(v));
 
-        const maxTemp = dayTemps.length ? Math.max(...dayTemps) : (dailyRaw.temperature_2m_max?.[idx] ?? 25);
-        const minTemp = dayTemps.length ? Math.min(...dayTemps) : (dailyRaw.temperature_2m_min?.[idx] ?? 15);
-        const totalPrecip = Number(dayPrecip.reduce((acc, v) => acc + v, 0).toFixed(1));
-        const maxWind = dayWinds.length ? Math.max(...dayWinds) : (dailyRaw.wind_speed_10m_max?.[idx] ?? 18);
-        const precipProb = dailyRaw.precipitation_probability_max?.[idx] ?? Math.max(...dayPrecip, 0);
-        const weatherCode = dailyRaw.weather_code?.[idx] ?? 0;
-
-        const hourlyDetail = dayTimes.map((t, hIndex) => ({
+        const hourlyDetail = baseTimes.slice(startH, endH).map((t, hIndex) => ({
           time: t.slice(11, 16),
-          temp: dayTemps[hIndex] ?? 20,
-          precip: dayPrecip[hIndex] ?? 0,
-          wind: dayWinds[hIndex] ?? 10,
-          code: dayCodes[hIndex] ?? weatherCode,
+          temp: num(baseTemp[startH + hIndex], 20),
+          precip: num(basePrecip[startH + hIndex], 0),
+          wind: num(baseWind[startH + hIndex], 10),
+          code: num(baseCodes[startH + hIndex], num(dailyRaw.weather_code?.[idx], 0)),
         }));
 
         return {
           date: dateStr,
-          dayName,
-          dayFormatted,
+          dayName: dayNames[dateObj.getDay()],
+          dayFormatted: `${dateObj.getDate()} de ${dateObj.toLocaleString('es-ES', { month: 'short' })}`,
           isToday: idx === 0,
-          tempMax: maxTemp,
-          tempMin: minTemp,
-          precipitationSum: totalPrecip,
-          precipitationProbability: precipProb,
-          windSpeedMax: maxWind,
-          weatherCode,
+          tempMax: dayTemps.length ? Math.max(...dayTemps) : num(dailyRaw.temperature_2m_max?.[idx], 25),
+          tempMin: dayTemps.length ? Math.min(...dayTemps) : num(dailyRaw.temperature_2m_min?.[idx], 15),
+          precipitationSum: Number(basePrecip.slice(startH, endH).filter((v) => Number.isFinite(v)).reduce((acc, v) => acc + v, 0).toFixed(1)),
+          precipitationProbability: num(dailyRaw.precipitation_probability_max?.[idx], 0),
+          windSpeedMax: num(dailyRaw.wind_speed_10m_max?.[idx], 18),
+          weatherCode: num(dailyRaw.weather_code?.[idx], 0),
           hourly: hourlyDetail,
         };
       });
-
-      const currentHourIdx = new Date().getHours();
-      const currentTemp = aiModels.ai_consensus.temp[currentHourIdx] ?? 22;
-      const currentWind = aiModels.ai_consensus.wind[currentHourIdx] ?? 12;
-      const currentPrecip = aiModels.ai_consensus.precip[currentHourIdx] ?? 0;
-      const currentHumidity = omData.hourly?.relative_humidity_2m?.[currentHourIdx] ?? 55;
-      const currentCode = baseCodes[currentHourIdx] ?? 0;
 
       const payload = {
         meta: {
@@ -262,100 +185,33 @@ export default async function handler(req, res) {
           elevation: omData.elevation,
           timezone: omData.timezone || 'Europe/Madrid',
           generatedAt: new Date().toISOString(),
-          isWeatherNextLive: false,
         },
         current: {
-          temperature: currentTemp,
-          feelsLike: Number((currentTemp + (currentWind > 20 ? -1.5 : 0.5)).toFixed(1)),
-          windSpeed: currentWind,
-          windDirection: baseWindDir[currentHourIdx] ?? 180,
-          precipitation: currentPrecip,
-          humidity: currentHumidity,
-          weatherCode: currentCode,
+          temperature: num(current.temperature_2m, 22),
+          feelsLike: num(current.apparent_temperature, num(current.temperature_2m, 22)),
+          windSpeed: num(current.wind_speed_10m, 12),
+          windDirection: num(current.wind_direction_10m, 180),
+          precipitation: num(current.precipitation, 0),
+          humidity: num(current.relative_humidity_2m, 55),
+          weatherCode: num(current.weather_code, 0),
         },
         times: baseTimes,
-        models: {
-          weathernext3: {
-            id: 'weathernext3',
-            name: 'Google WeatherNext 3',
-            developer: 'Google DeepMind',
-            architecture: 'High-Res Real-Time Observation Neural Model',
-            badge: 'DeepMind 2026',
-            isLive: false,
-            color: '#3b82f6',
-            hourly: {
-              temperature: aiModels.weathernext3.temp,
-              precipitation: aiModels.weathernext3.precip,
-              precipitation_probability: basePrecipProb,
-              wind_speed: aiModels.weathernext3.wind,
-              wind_direction: baseWindDir,
-            },
+        models: Object.fromEntries(AI_MODELS.map((m) => [m.id, {
+          id: m.id,
+          name: m.name,
+          developer: m.developer,
+          architecture: m.architecture,
+          badge: m.badge,
+          isLive: true,
+          color: m.color,
+          hourly: {
+            temperature: series(omData.hourly, 'temperature_2m', m.om),
+            precipitation: series(omData.hourly, 'precipitation', m.om),
+            precipitation_probability: [],
+            wind_speed: series(omData.hourly, 'wind_speed_10m', m.om),
+            wind_direction: series(omData.hourly, 'wind_direction_10m', m.om),
           },
-          ecmwf_aifs: {
-            id: 'ecmwf_aifs',
-            name: 'ECMWF AIFS',
-            developer: 'Centro Europeo (ECMWF)',
-            architecture: 'Artificial Intelligence Forecasting System',
-            badge: 'ECMWF AI',
-            isLive: false,
-            color: '#10b981',
-            hourly: {
-              temperature: aiModels.ecmwf_aifs.temp,
-              precipitation: aiModels.ecmwf_aifs.precip,
-              precipitation_probability: basePrecipProb,
-              wind_speed: aiModels.ecmwf_aifs.wind,
-              wind_direction: baseWindDir,
-            },
-          },
-          graphcast: {
-            id: 'graphcast',
-            name: 'Google GraphCast',
-            developer: 'Google DeepMind',
-            architecture: 'Graph Neural Network (GNN)',
-            badge: 'DeepMind GNN',
-            isLive: false,
-            color: '#8b5cf6',
-            hourly: {
-              temperature: aiModels.graphcast.temp,
-              precipitation: aiModels.graphcast.precip,
-              precipitation_probability: basePrecipProb,
-              wind_speed: aiModels.graphcast.wind,
-              wind_direction: baseWindDir,
-            },
-          },
-          pangu_weather: {
-            id: 'pangu_weather',
-            name: 'Pangu-Weather',
-            developer: 'Huawei Cloud AI',
-            architecture: '3D Earth-Specific Transformer',
-            badge: '3D Vision AI',
-            isLive: false,
-            color: '#f59e0b',
-            hourly: {
-              temperature: aiModels.pangu_weather.temp,
-              precipitation: aiModels.pangu_weather.precip,
-              precipitation_probability: basePrecipProb,
-              wind_speed: aiModels.pangu_weather.wind,
-              wind_direction: baseWindDir,
-            },
-          },
-          ai_consensus: {
-            id: 'ai_consensus',
-            name: 'Consenso Multi-IA',
-            developer: 'Ensemble Neural Mean',
-            architecture: 'Multi-Architecture Weighted Ensemble',
-            badge: 'Consenso IA',
-            isLive: false,
-            color: '#06b6d4',
-            hourly: {
-              temperature: aiModels.ai_consensus.temp,
-              precipitation: aiModels.ai_consensus.precip,
-              precipitation_probability: basePrecipProb,
-              wind_speed: aiModels.ai_consensus.wind,
-              wind_direction: baseWindDir,
-            },
-          },
-        },
+        }])),
         sevenDayForecast,
       };
 
