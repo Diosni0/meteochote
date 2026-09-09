@@ -50,6 +50,27 @@ Si dispones de una clave de Google Cloud con la **Google Maps Platform Weather A
 
 ## ✨ Características Principales
 
+### Capas sobre el mapa
+
+Los botones **Temperatura**, **Lluvia** y **Viento** seleccionan un gradiente
+georreferenciado que se actualiza con la hora y el modelo seleccionados. En
+**Capas** puedes ajustar su opacidad, ocultarlo y mostrar u ocultar las estaciones
+de forma independiente. La leyenda mantiene escalas fijas en °C, mm acumulados
+en una hora y km/h. La lluvia cero y las zonas sin cobertura son transparentes.
+
+Esta visualización interpola los puntos del resumen actual, incluidos Baleares
+y Canarias, con un radio máximo de 250 km. Es una aproximación visual, no un
+radar ni una malla de alta resolución como Windy; tampoco incluye partículas
+animadas de viento. No necesita una nueva clave API.
+
+**Limitación de los datos existentes:** el servidor obtiene previsiones de
+Open-Meteo y genera variantes sintéticas con etiquetas de modelos IA. Estas
+capas no constituyen salidas oficiales de WeatherNext, AIFS, GraphCast o Pangu.
+
+Pruebas de interpolación y paletas: `npm test` (Node.js 22.6 o posterior).
+
+### Otras funciones
+
 1. **Buscador de Municipios Españoles**: Búsqueda reactiva con autocompletado en tiempo real de cualquier pueblo, municipio o ciudad de España (Península, Baleares y Canarias).
 2. **Mapa Interactivo (Leaflet)**: Haz clic sobre cualquier punto del territorio español para fijar las coordenadas exactas y consultar los modelos de IA.
 3. **Pestaña 1: Comparador de Modelos de IA**:

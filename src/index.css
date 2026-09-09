@@ -61,6 +61,16 @@
   background-color: #0f172a !important;
 }
 
+.leaflet-top.leaflet-right {
+  top: 15rem;
+}
+
+@media (min-width: 1024px) {
+  .leaflet-top.leaflet-right {
+    top: 5rem;
+  }
+}
+
 /* Custom animations */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }

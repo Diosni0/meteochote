@@ -103,8 +103,8 @@ export interface SpainStation {
 }
 
 export interface HeatmapPoint {
-  x: number;
-  y: number;
+  lat: number;
+  lon: number;
   value: number;
 }
 

@@ -1,139 +1,59 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
-import h337 from 'heatmap.js';
-import { WeatherVariable } from '../types';
+import L from 'leaflet';
+import { HeatmapPoint, WeatherVariable } from '../types';
+import { interpolateWeather, weatherColor } from '../services/weatherLayers';
 
 interface HeatmapLayerProps {
-  data: Array<{ x: number; y: number; value: number }>;
-  radius?: number;
-  blur?: number;
-  maxOpacity?: number;
-  minOpacity?: number;
-  gradient?: Record<string, string>;
+  data: HeatmapPoint[];
+  opacity: number;
   visible: boolean;
-  activeVariable?: WeatherVariable;
+  activeVariable: WeatherVariable;
 }
 
-const defaultGradients = {
-  temperature: {
-    0.2: '#0000FF',
-    0.4: '#00FFFF',
-    0.6: '#00FF00',
-    0.8: '#FFFF00',
-    1.0: '#FF0000'
-  },
-  precipitation: {
-    0.2: '#FFFFFF',
-    0.4: '#B0E0E6',
-    0.6: '#87CEEB',
-    0.8: '#00BFFF',
-    1.0: '#0000FF'
-  },
-  wind: {
-    0.2: '#00FF00',
-    0.4: '#ADFF2F',
-    0.6: '#FFFF00',
-    0.8: '#FF8C00',
-    1.0: '#FF0000'
-  }
-};
-
-export const HeatmapLayer: React.FC<HeatmapLayerProps> = ({
-  data,
-  radius = 30,
-  blur = 15,
-  maxOpacity = 0.7,
-  minOpacity = 0.1,
-  visible,
-  activeVariable = 'temperature',
-}) => {
+export function HeatmapLayer({ data, opacity, visible, activeVariable }: HeatmapLayerProps) {
   const map = useMap();
-  const heatmapRef = useRef<any | null>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const layerRef = useRef<L.GridLayer | null>(null);
 
   useEffect(() => {
-    if (!map || !wrapperRef.current) return;
+    if (!visible || !data.length) return;
 
-    // Create wrapper div
-    const wrapper = wrapperRef.current;
-    wrapper.style.position = 'absolute';
-    wrapper.style.top = '0';
-    wrapper.style.left = '0';
-    wrapper.style.width = '100%';
-    wrapper.style.height = '100%';
-    wrapper.style.pointerEvents = 'none';
-    wrapper.style.zIndex = '500';
-
-    // Create heatmap instance
-    const heatmap = h337.create({
-      container: wrapper,
-      radius: radius,
-      blur: blur,
-      maxOpacity: maxOpacity,
-      minOpacity: minOpacity,
-      gradient: defaultGradients[activeVariable as keyof typeof defaultGradients],
-    });
-
-    heatmapRef.current = heatmap;
-
-    // Update data
-    if (data && data.length > 0) {
-      const maxVal = Math.max(...data.map(d => d.value));
-      const minVal = Math.min(...data.map(d => d.value));
-      
-      heatmap.setData({
-        max: maxVal,
-        min: minVal,
-        data: data,
-      });
-    }
-
-    // Update position on map events
-    const updateHeatmapPosition = () => {
-      if (heatmapRef.current && wrapperRef.current) {
-        wrapperRef.current.style.width = map.getSize().x + 'px';
-        wrapperRef.current.style.height = map.getSize().y + 'px';
-        wrapperRef.current.style.left = '0px';
-        wrapperRef.current.style.top = '0px';
+    // Leaflet owns tile projection, pan/zoom transforms and cleanup. Sampling a
+    // small raster keeps playback inexpensive; CSS scales it with smoothing.
+    class WeatherTiles extends L.GridLayer {
+      createTile(coords: L.Coords) {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 64;
+        canvas.style.pointerEvents = 'none';
+        const context = canvas.getContext('2d');
+        if (!context) return canvas;
+        const image = context.createImageData(64, 64);
+        for (let y = 0; y < 64; y++) {
+          for (let x = 0; x < 64; x++) {
+            const location = map.unproject(L.point(coords.x * 256 + (x + 0.5) * 4, coords.y * 256 + (y + 0.5) * 4), coords.z);
+            const sample = interpolateWeather(data, location.lat, location.lng);
+            if (!sample) continue;
+            const color = weatherColor(activeVariable, sample.value);
+            color[3] = Math.round(color[3] * sample.coverage);
+            image.data.set(color, (y * 64 + x) * 4);
+          }
+        }
+        context.putImageData(image, 0, 0);
+        return canvas;
       }
-    };
-
-    map.on('moveend zoomend', updateHeatmapPosition);
-    updateHeatmapPosition();
-
+    }
+    const layer = new WeatherTiles({ tileSize: 256, pane: 'overlayPane', noWrap: true, updateWhenIdle: true });
+    layerRef.current = layer;
+    layer.addTo(map);
     return () => {
-      map.off('moveend zoomend', updateHeatmapPosition);
-      if (heatmapRef.current) {
-        heatmapRef.current.remove();
-      }
+      layer.remove();
+      layerRef.current = null;
     };
-  }, [map, data, radius, blur, maxOpacity, minOpacity, activeVariable]);
+  }, [map, data, visible, activeVariable]);
 
-  // Handle visibility changes
   useEffect(() => {
-    if (wrapperRef.current) {
-      wrapperRef.current.style.display = visible ? 'block' : 'none';
-    }
-  }, [visible]);
+    layerRef.current?.setOpacity(opacity);
+  }, [opacity, data, visible, activeVariable]);
 
-  // Update data when it changes
-  useEffect(() => {
-    if (heatmapRef.current && data && data.length > 0) {
-      const maxVal = Math.max(...data.map(d => d.value));
-      const minVal = Math.min(...data.map(d => d.value));
-      heatmapRef.current.setData({
-        max: maxVal,
-        min: minVal,
-        data: data,
-      });
-    }
-  }, [data]);
-
-  if (!visible) return null;
-
-  return (
-    <div 
-      ref={wrapperRef}
-    />
-  );
-};
+  return null;
+}

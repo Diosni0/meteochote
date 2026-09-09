@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, LayerGroup } from 'react-leaflet';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
-import { LocationItem, SpainStation, WeatherModelId, WeatherVariable, HeatmapPoint } from '../types';
+import { LocationItem, SpainStation, WeatherModelId, WeatherVariable } from '../types';
 import { getWeatherDescription } from '../services/weatherApi';
-import { Layers, MapPin, Eye } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { useHeatmapData } from '../hooks/useHeatmapData';
 import { HeatmapLayer } from './HeatmapLayer';
+import { WEATHER_SCALES } from '../services/weatherLayers';
 
 interface WeatherMapProps {
   stations: SpainStation[];
@@ -13,7 +14,12 @@ interface WeatherMapProps {
   activeVariable: WeatherVariable;
   hourIndex: number;
   currentLocation: LocationItem;
-  layerVisibility: Record<WeatherVariable, boolean>;
+  overlayVisible: boolean;
+  overlayOpacity: number;
+  showStations: boolean;
+  overviewLoading: boolean;
+  overviewError: string | null;
+  selectedTime: string | undefined;
   onSelectStation: (station: SpainStation) => void;
   onSelectCoords: (lat: number, lon: number, name?: string) => void;
 }
@@ -121,32 +127,29 @@ const StationLayer: React.FC<{
   activeModel: WeatherModelId;
   activeVariable: WeatherVariable;
   hourIndex: number;
-  layerVisibility: Record<WeatherVariable, boolean>;
   currentLocation: LocationItem;
   onSelectStation: (station: SpainStation) => void;
-}> = ({ stations, activeModel, activeVariable, hourIndex, layerVisibility, currentLocation, onSelectStation }) => {
-  const isLayerVisible = layerVisibility[activeVariable];
-
-  if (!isLayerVisible) return null;
-
+}> = ({ stations, activeModel, activeVariable, hourIndex, currentLocation, onSelectStation }) => {
   return (
     <>
       {stations.map((st) => {
-        const modelData = st.models[activeModel] || st.models.weathernext3;
+        const modelData = st.models[activeModel];
+        if (!modelData) return null;
         let val = 0;
         let valStr = '';
 
         if (activeVariable === 'temperature') {
-          val = modelData.temp[hourIndex] ?? 20;
+          val = modelData.temp[hourIndex];
           valStr = `${val}°`;
         } else if (activeVariable === 'precipitation') {
-          val = modelData.precip[hourIndex] ?? 0;
+          val = modelData.precip[hourIndex];
           valStr = `${val}mm`;
         } else {
-          val = modelData.wind[hourIndex] ?? 10;
-          valStr = `${val}k`;
+          val = modelData.wind[hourIndex];
+          valStr = `${val} km/h`;
         }
 
+        if (typeof val !== 'number' || !Number.isFinite(val)) return null;
         const weatherCode = st.weatherCodes[hourIndex] ?? 0;
         const condition = getWeatherDescription(weatherCode);
         const colors = getBadgeColor(activeVariable, val);
@@ -216,50 +219,13 @@ const MapEventsHandler: React.FC<{ onSelectCoords: (lat: number, lon: number) =>
 // Smooth flying controller
 const FlyToCenter: React.FC<{ center: [number, number] }> = ({ center }) => {
   const map = useMap();
+  const [lat, lon] = center;
   useEffect(() => {
-    map.flyTo(center, Math.max(map.getZoom(), 7), {
+    map.flyTo([lat, lon], map.getZoom(), {
       duration: 1.0,
     });
-  }, [center, map]);
+  }, [lat, lon, map]);
   return null;
-};
-
-// Tile layer optimizator - prevents tile loading during drag
-const OptimizedTileLayer: React.FC<{ url: string; attribution: string; maxZoom: number }> = ({ url, attribution, maxZoom }) => {
-  const map = useMap();
-  
-  useEffect(() => {
-    // Disable tile loading during drag using internal API
-    // @ts-ignore
-    const originalOnMove = map.onMove;
-    // @ts-ignore
-    map.onMove = function() {
-      // Suppress during drag
-    };
-    
-    map.on('dragend', () => {
-      // Restore after drag ends
-      map.eachLayer((layer: any) => {
-        if (layer.redraw) layer.redraw();
-      });
-    });
-    
-    return () => {
-      map.off('dragend');
-      // @ts-ignore
-      map.onMove = originalOnMove;
-    };
-  }, [map]);
-
-  return (
-    <TileLayer
-      url={url}
-      attribution={attribution}
-      maxZoom={maxZoom}
-      updateWhenIdle={true}
-      updateWhenZooming={false}
-    />
-  );
 };
 
 export const WeatherMap: React.FC<WeatherMapProps> = ({
@@ -268,7 +234,12 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
   activeVariable,
   hourIndex,
   currentLocation,
-  layerVisibility,
+  overlayVisible,
+  overlayOpacity,
+  showStations,
+  overviewLoading,
+  overviewError,
+  selectedTime,
   onSelectStation,
   onSelectCoords,
 }) => {
@@ -277,20 +248,28 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
 
   // Generate heatmap data based on stations and current variable
   const heatmapData = useHeatmapData(stations, activeModel, activeVariable, hourIndex);
+  const scale = WEATHER_SCALES[activeVariable];
+  const min = scale.stops[0].value;
+  const max = scale.stops[scale.stops.length - 1].value;
+  const gradient = `linear-gradient(to right, ${scale.stops.map(stop =>
+    `rgb(${stop.color.join(',')}) ${(stop.value - min) / (max - min) * 100}%`
+  ).join(', ')})`;
+  const status = overviewLoading ? 'Cargando capas meteorológicas...'
+    : overviewError || (!heatmapData.length ? 'Sin datos para esta capa y hora.' : null);
 
-  // Tile layer URLs: 100% open, NO API KEY REQUIRED, NO WATERMARK
+  // Basemap tiles remain below the meteorological raster.
   const darkTileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
   const satelliteTileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
   return (
-    <div className="relative w-full h-full min-h-[500px] sm:min-h-[620px] rounded-3xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-950">
+    <div className="relative w-full h-full rounded-3xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-950">
       {/* Map Container Gradient Border */}
       <div className="absolute inset-0 rounded-3xl pointer-events-none bg-gradient-to-b from-blue-500/5 via-cyan-500/5 to-indigo-500/5 z-0" />
       
       {/* Top Left: Basemap and Region Quick Switcher */}
-      <div className="absolute top-4 left-4 z-[1000] flex flex-wrap items-center gap-2">
+      <div className="absolute top-48 lg:top-20 left-4 right-4 z-[1000] flex flex-wrap items-center gap-2 pointer-events-none">
         {/* Basemap Toggle */}
-        <div className="bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/80 shadow-lg flex items-center text-xs">
+        <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/80 shadow-lg flex items-center text-xs">
           <button
             onClick={() => setMapTheme('dark')}
             className={`px-2.5 py-1 rounded-lg transition-colors font-medium ${
@@ -310,7 +289,7 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
         </div>
 
         {/* Region Shortcuts */}
-        <div className="hidden sm:flex bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/80 shadow-lg items-center text-xs gap-1">
+        <div className="pointer-events-auto flex bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/80 shadow-lg items-center text-[10px] sm:text-xs gap-1">
           <button
             onClick={() => onSelectCoords(40.4168, -3.7038, 'Península Ibérica')}
             className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors font-medium"
@@ -331,72 +310,59 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
           </button>
         </div>
         
-        {/* Layer Legend Pill */}
-        <div className="hidden md:flex bg-slate-900/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-700/80 shadow-lg items-center text-[10px] gap-2">
-          <span className="text-slate-400 font-medium">Capas activas:</span>
-          <div className="flex items-center gap-1.5">
-            {layerVisibility.temperature && (
-              <div className="flex items-center gap-1 text-slate-300">
-                <div className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.6)]" />
-                <span className="font-medium">Temperatura</span>
-              </div>
-            )}
-            {layerVisibility.precipitation && (
-              <div className="flex items-center gap-1 text-slate-300">
-                <div className="w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_6px_rgba(37,99,235,0.6)]" />
-                <span className="font-medium">Lluvia</span>
-              </div>
-            )}
-            {layerVisibility.wind_speed && (
-              <div className="flex items-center gap-1 text-slate-300">
-                <div className="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_6px_rgba(20,184,166,0.6)]" />
-                <span className="font-medium">Viento</span>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* Helper pill at bottom left */}
-      <div className="absolute bottom-4 left-4 z-[1000] bg-slate-900/95 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700/80 text-xs text-slate-200 flex items-center gap-2 shadow-xl">
-        <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
-        <span>Haz clic en cualquier punto del mapa o en las estaciones para ver la previsión de IA</span>
-      </div>
+      <section aria-label="Leyenda meteorológica" className="absolute bottom-48 sm:bottom-52 left-4 right-4 sm:right-auto sm:w-80 z-[1000] bg-slate-900/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-700/80 text-xs text-slate-200 shadow-xl pointer-events-none">
+        <div className="flex justify-between gap-2 font-semibold">
+          <span>{scale.label}{!overlayVisible && ' (oculta)'}</span>
+          <span className="text-slate-400">{scale.unit}</span>
+        </div>
+        {selectedTime && <p className="hidden sm:block text-[10px] text-slate-400 mt-1">{selectedTime.replace('T', ' · ')} · hora peninsular</p>}
+        {overlayVisible && !status && <>
+          <div className="h-2.5 rounded-full mt-3" style={{ background: gradient }} />
+          <div className="relative h-4 mt-1 text-[9px] tabular-nums">
+            {scale.stops.filter((_, index) => activeVariable !== 'precipitation' || index !== 1).map((stop, index, stops) => (
+              <span key={stop.value} className="absolute" style={{ left: `${(stop.value - min) / (max - min) * 100}%`, transform: index === 0 ? 'none' : index === stops.length - 1 ? 'translateX(-100%)' : 'translateX(-50%)' }}>{stop.value}</span>
+            ))}
+          </div>
+        </>}
+        {status ? <p role="status" className="mt-2 text-amber-300">{status}</p> : <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Interpolación aproximada · {heatmapData.length} puntos<span className="hidden sm:inline">. Sin cobertura, el mapa queda transparente. No es radar.</span></p>}
+      </section>
 
       <MapContainer
         center={position}
         zoom={6}
+        zoomControl={false}
         scrollWheelZoom={true}
         className="w-full h-full z-10"
       >
-        <OptimizedTileLayer
+        <ZoomControl position="topright" />
+        <TileLayer
           key={mapTheme}
           attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
           url={mapTheme === 'dark' ? darkTileUrl : satelliteTileUrl}
           maxZoom={16}
+          updateWhenIdle={true}
+          updateWhenZooming={false}
         />
         <FlyToCenter center={position} />
         <MapEventsHandler onSelectCoords={onSelectCoords} />
 
         {/* Render Station Markers based on layer visibility */}
-        <StationLayer
+        {showStations && <StationLayer
           stations={stations}
           activeModel={activeModel}
           activeVariable={activeVariable}
           hourIndex={hourIndex}
-          layerVisibility={layerVisibility}
           currentLocation={currentLocation}
           onSelectStation={onSelectStation}
-        />
+        />}
 
         {/* Heatmap Layer for current variable */}
         <HeatmapLayer
           data={heatmapData}
-          radius={30}
-          blur={15}
-          maxOpacity={0.6}
-          minOpacity={0.1}
-          visible={layerVisibility[activeVariable]}
+          opacity={overlayOpacity}
+          visible={overlayVisible}
           activeVariable={activeVariable}
         />
 

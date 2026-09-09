@@ -38,7 +38,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
   const formattedHour = `${dateObj.getHours().toString().padStart(2, '0')}:00h`;
 
   const offsetHours = currentIndex;
-  let offsetLabel = 'En directo (Ahora)';
+  let offsetLabel = 'Inicio previsión';
   if (offsetHours > 0) {
     const days = Math.floor(offsetHours / 24);
     const remH = offsetHours % 24;
@@ -49,18 +49,18 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     <div className="absolute bottom-4 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[620px] z-[1000] bg-gradient-to-b from-slate-900/95 to-slate-900/80 backdrop-blur-xl border border-slate-700/90 rounded-3xl shadow-2xl p-4 text-slate-100 flex flex-col gap-3 animate-fade-in">
       {/* Top Header info */}
       <div className="flex items-center justify-between text-xs">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-3">
           <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-700/50 backdrop-blur-sm">
             <Clock className="w-4 h-4 text-blue-400" />
-            <span className="font-bold text-white text-sm">{formattedDate}</span>
+            <span className="font-bold text-white text-xs sm:text-sm">{formattedDate}</span>
           </div>
           <span className="font-mono text-blue-400 font-bold text-sm bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-3 py-1.5 rounded-xl border border-blue-500/20 backdrop-blur-sm">
             {formattedHour}
           </span>
         </div>
 
-        <div className={`px-3 py-1.5 rounded-xl text-[11px] font-semibold backdrop-blur-sm border ${
-          offsetLabel === 'En directo (Ahora)'
+        <div className={`hidden sm:block px-3 py-1.5 rounded-xl text-[11px] font-semibold backdrop-blur-sm border ${
+          offsetLabel === 'Inicio previsión'
             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
             : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
         }`}>
@@ -87,6 +87,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
         <div className="flex-1 relative flex items-center">
           <input
             type="range"
+            aria-label="Hora de previsión"
             min={0}
             max={maxIndex}
             value={currentIndex}
@@ -141,7 +142,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
           onClick={() => { setIsPlaying(false); onIndexChange(0); }}
           className="hover:text-blue-400 transition-colors font-medium"
         >
-          Ahora
+           Inicio
         </button>
         <button
           onClick={() => { setIsPlaying(false); onIndexChange(12); }}
@@ -153,7 +154,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
           onClick={() => { setIsPlaying(false); onIndexChange(24); }}
           className="hover:text-blue-400 transition-colors"
         >
-          +24h (Mañana)
+           +24h
         </button>
         <button
           onClick={() => { setIsPlaying(false); onIndexChange(48); }}
@@ -177,7 +178,7 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
           onClick={() => { setIsPlaying(false); onIndexChange(maxIndex); }}
           className="hover:text-blue-400 transition-colors font-medium"
         >
-          +7 días
+           Final
         </button>
       </div>
     </div>
