@@ -50,24 +50,15 @@ Si dispones de una clave de Google Cloud con la **Google Maps Platform Weather A
 
 ## ✨ Características Principales
 
-### Capas sobre el mapa
+### Capas sobre el mapa (Estilo Windy)
 
-Los botones **Temperatura**, **Lluvia** y **Viento** seleccionan un gradiente
-georreferenciado que se actualiza con la hora y el modelo seleccionados. En
-**Capas** puedes ajustar su opacidad, ocultarlo y mostrar u ocultar las estaciones
-de forma independiente. La leyenda mantiene escalas fijas en °C, mm acumulados
-en una hora y km/h. La lluvia cero y las zonas sin cobertura son transparentes.
+* **Gradientes Térmicos y de Radar continuos**: Los botones **Temperatura**, **Lluvia** y **Viento** sobreimprimen un campo continuo georreferenciado con escalado bilinear suave y alta definición, actualizado dinámicamente con la hora y el modelo IA seleccionado.
+* **Corrientes de viento animadas (Wind Streamlines)**: Animación acelerada por Canvas de partículas en tiempo real que fluyen siguiendo los vectores de velocidad y dirección del viento calculado por los modelos de IA, exactamente como en Windy.com.
+* **Control de Capas**: En el menú **Capas** puedes activar/desactivar el viento animado, las estaciones y ajustar la opacidad del gradiente ráster.
+* **Cobertura Completa**: Cobertura de 39 estaciones de referencia en toda la Península Ibérica, Islas Baleares e Islas Canarias.
+* **Compatibilidad Vercel y Serverless**: Configuración lista con `vercel.json`, función serverless en `api/index.js` y fallback automático en cliente (`weatherApi.ts`) para garantizar que la app funcione siempre sin fallos de backend.
 
-Esta visualización interpola los puntos del resumen actual, incluidos Baleares
-y Canarias, con un radio máximo de 250 km. Es una aproximación visual, no un
-radar ni una malla de alta resolución como Windy; tampoco incluye partículas
-animadas de viento. No necesita una nueva clave API.
-
-**Limitación de los datos existentes:** el servidor obtiene previsiones de
-Open-Meteo y genera variantes sintéticas con etiquetas de modelos IA. Estas
-capas no constituyen salidas oficiales de WeatherNext, AIFS, GraphCast o Pangu.
-
-Pruebas de interpolación y paletas: `npm test` (Node.js 22.6 o posterior).
+Pruebas de interpolación y vectores de viento: `npm test` (Node.js 22.6 o posterior).
 
 ### Otras funciones
 

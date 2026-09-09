@@ -45,7 +45,26 @@ const SPAIN_STATIONS = [
   { id: 17, name: 'Toledo', admin: 'Castilla-La Mancha', lat: 39.8628, lon: -4.0273 },
   { id: 18, name: 'Pamplona', admin: 'Navarra', lat: 42.8125, lon: -1.6458 },
   { id: 19, name: 'Oviedo', admin: 'Asturias', lat: 43.3619, lon: -5.8494 },
-  { id: 20, name: 'Logroño', admin: 'La Rioja', lat: 42.4627, lon: -2.4450 }
+  { id: 20, name: 'Logroño', admin: 'La Rioja', lat: 42.4627, lon: -2.4450 },
+  { id: 21, name: 'Albacete', admin: 'Castilla-La Mancha', lat: 38.9943, lon: -1.8585 },
+  { id: 22, name: 'Alicante', admin: 'C. Valenciana', lat: 38.3452, lon: -0.4810 },
+  { id: 23, name: 'Almería', admin: 'Andalucía', lat: 36.8381, lon: -2.4597 },
+  { id: 24, name: 'Burgos', admin: 'Castilla y León', lat: 42.3440, lon: -3.6969 },
+  { id: 25, name: 'Cáceres', admin: 'Extremadura', lat: 39.4753, lon: -6.3723 },
+  { id: 26, name: 'Cádiz', admin: 'Andalucía', lat: 36.5271, lon: -6.2886 },
+  { id: 27, name: 'Ciudad Real', admin: 'Castilla-La Mancha', lat: 38.9861, lon: -3.9274 },
+  { id: 28, name: 'Córdoba', admin: 'Andalucía', lat: 37.8882, lon: -4.7794 },
+  { id: 29, name: 'Girona', admin: 'Cataluña', lat: 41.9794, lon: 2.8214 },
+  { id: 30, name: 'Huelva', admin: 'Andalucía', lat: 37.2614, lon: -6.9447 },
+  { id: 31, name: 'León', admin: 'Castilla y León', lat: 42.5987, lon: -5.5671 },
+  { id: 32, name: 'Lleida', admin: 'Cataluña', lat: 41.6176, lon: 0.6200 },
+  { id: 33, name: 'Ourense', admin: 'Galicia', lat: 42.3358, lon: -7.8639 },
+  { id: 34, name: 'Salamanca', admin: 'Castilla y León', lat: 40.9701, lon: -5.6635 },
+  { id: 35, name: 'Donostia', admin: 'País Vasco', lat: 43.3183, lon: -1.9812 },
+  { id: 36, name: 'Vigo', admin: 'Galicia', lat: 42.2406, lon: -8.7207 },
+  { id: 37, name: 'Menorca', admin: 'Baleares', lat: 39.8885, lon: 4.2658 },
+  { id: 38, name: 'Ibiza', admin: 'Baleares', lat: 38.9067, lon: 1.4206 },
+  { id: 39, name: 'Lanzarote', admin: 'Canarias', lat: 28.9630, lon: -13.5477 },
 ];
 
 // Helper to compute AI model variants from base hourly telemetry
@@ -226,6 +245,7 @@ app.get('/api/spain-overview', async (req, res) => {
         lat: station.lat,
         lon: station.lon,
         weatherCodes: bCodes,
+        windDirections: bWindDir,
         models: aiModels,
       };
     });

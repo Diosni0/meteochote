@@ -6,6 +6,7 @@ import { getWeatherDescription } from '../services/weatherApi';
 import { MapPin } from 'lucide-react';
 import { useHeatmapData } from '../hooks/useHeatmapData';
 import { HeatmapLayer } from './HeatmapLayer';
+import { WindParticlesLayer } from './WindParticlesLayer';
 import { WEATHER_SCALES } from '../services/weatherLayers';
 
 interface WeatherMapProps {
@@ -17,6 +18,7 @@ interface WeatherMapProps {
   overlayVisible: boolean;
   overlayOpacity: number;
   showStations: boolean;
+  showWindParticles?: boolean;
   overviewLoading: boolean;
   overviewError: string | null;
   selectedTime: string | undefined;
@@ -237,6 +239,7 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
   overlayVisible,
   overlayOpacity,
   showStations,
+  showWindParticles = true,
   overviewLoading,
   overviewError,
   selectedTime,
@@ -254,10 +257,11 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
   const gradient = `linear-gradient(to right, ${scale.stops.map(stop =>
     `rgb(${stop.color.join(',')}) ${(stop.value - min) / (max - min) * 100}%`
   ).join(', ')})`;
-  const status = overviewLoading ? 'Cargando capas meteorológicas...'
+  const status = overviewLoading
+    ? 'Cargando capas meteorológicas...'
     : overviewError || (!heatmapData.length ? 'Sin datos para esta capa y hora.' : null);
 
-  // Basemap tiles remain below the meteorological raster.
+  // Basemap tiles remain below the meteorological raster
   const darkTileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
   const satelliteTileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 
@@ -309,7 +313,6 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
             Canarias
           </button>
         </div>
-        
       </div>
 
       <section aria-label="Leyenda meteorológica" className="absolute bottom-48 sm:bottom-52 left-4 right-4 sm:right-auto sm:w-80 z-[1000] bg-slate-900/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-700/80 text-xs text-slate-200 shadow-xl pointer-events-none">
@@ -326,7 +329,7 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
             ))}
           </div>
         </>}
-        {status ? <p role="status" className="mt-2 text-amber-300">{status}</p> : <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Interpolación aproximada · {heatmapData.length} puntos<span className="hidden sm:inline">. Sin cobertura, el mapa queda transparente. No es radar.</span></p>}
+        {status ? <p role="status" className="mt-2 text-amber-300">{status}</p> : <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Interpolación continua IA · {heatmapData.length} estaciones<span className="hidden sm:inline"> · Corrientes de viento animadas (Windy)</span></p>}
       </section>
 
       <MapContainer
@@ -364,6 +367,13 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
           opacity={overlayOpacity}
           visible={overlayVisible}
           activeVariable={activeVariable}
+        />
+
+        {/* Animated Wind Particle Streamlines Layer (Windy style) */}
+        <WindParticlesLayer
+          data={heatmapData}
+          visible={showWindParticles}
+          opacity={0.85}
         />
 
         {/* Active Pinpoint Marker */}

@@ -99,6 +99,7 @@ export interface SpainStation {
   lat: number;
   lon: number;
   weatherCodes: number[];
+  windDirections?: number[];
   models: Record<WeatherModelId, StationHourly>;
 }
 
@@ -106,6 +107,8 @@ export interface HeatmapPoint {
   lat: number;
   lon: number;
   value: number;
+  windDir?: number;
+  windSpeed?: number;
 }
 
 export interface SpainOverviewResponse {
@@ -113,4 +116,3 @@ export interface SpainOverviewResponse {
   stations: SpainStation[];
   generatedAt: string;
 }
-

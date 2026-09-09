@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { interpolateWeather, weatherColor, WEATHER_SCALES } from '../src/services/weatherLayers.ts';
+import { interpolateWeather, interpolateWindVector, weatherColor, WEATHER_SCALES } from '../src/services/weatherLayers.ts';
 
 test('exact station values, including negative temperatures and zero rain, are preserved', () => {
   for (const value of [-8, 0, 32]) {
@@ -39,4 +39,16 @@ test('dry areas are transparent and light rain fades in', () => {
   assert.ok(weatherColor('precipitation', 0.1)[3] > 0);
   assert.ok(weatherColor('precipitation', 0.1)[3] < 255);
   assert.equal(weatherColor('precipitation', 1)[3], 255);
+});
+
+test('vector wind interpolation preserves speed and direction', () => {
+  const points = [
+    { lat: 40, lon: -4, value: 20, windSpeed: 20, windDir: 180 }, // South wind
+    { lat: 40, lon: -2, value: 20, windSpeed: 20, windDir: 180 }
+  ];
+  const sample = interpolateWindVector(points, 40, -3);
+  assert.ok(sample !== null);
+  assert.ok(Math.abs(sample.speed - 20) < 0.1);
+  assert.ok(Math.abs(sample.direction - 180) < 1.0);
+  assert.equal(interpolateWindVector([], 40, -3), null);
 });

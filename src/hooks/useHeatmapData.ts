@@ -10,9 +10,19 @@ export const useHeatmapData = (
   const points: HeatmapPoint[] = [];
   const field = activeVariable === 'temperature' ? 'temp' : activeVariable === 'precipitation' ? 'precip' : 'wind';
   for (const station of stations) {
-    const value = station.models[activeModel]?.[field][hourIndex];
+    const modelData = station.models[activeModel];
+    if (!modelData) continue;
+    const value = modelData[field]?.[hourIndex];
     if (typeof value === 'number' && Number.isFinite(value)) {
-      points.push({ lat: station.lat, lon: station.lon, value });
+      const windSpeed = modelData.wind?.[hourIndex] ?? 0;
+      const windDir = station.windDirections?.[hourIndex] ?? 0;
+      points.push({
+        lat: station.lat,
+        lon: station.lon,
+        value,
+        windDir,
+        windSpeed,
+      });
     }
   }
   return points;

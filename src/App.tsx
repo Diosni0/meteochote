@@ -57,6 +57,7 @@ export const App: React.FC = () => {
   const [overlayVisible, setOverlayVisible] = useState<boolean>(true);
   const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
   const [showStations, setShowStations] = useState<boolean>(true);
+  const [showWindParticles, setShowWindParticles] = useState<boolean>(true);
   const [showLayerControl, setShowLayerControl] = useState(false);
 
   // Load Spain overview on mount
@@ -265,6 +266,17 @@ export const App: React.FC = () => {
                     <span>Ver estaciones</span>
                     {showStations ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
                   </button>
+                  <button
+                    onClick={() => setShowWindParticles(prev => !prev)}
+                    aria-pressed={showWindParticles}
+                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-all"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Wind className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Viento animado (Windy)</span>
+                    </span>
+                    {showWindParticles ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
+                  </button>
                 </div>
               </div>
             </div>
@@ -326,6 +338,7 @@ export const App: React.FC = () => {
           overlayVisible={overlayVisible}
           overlayOpacity={overlayOpacity}
           showStations={showStations}
+          showWindParticles={showWindParticles}
           overviewLoading={overviewLoading}
           overviewError={overviewError}
           selectedTime={timelineTimes[currentHourIndex]}
