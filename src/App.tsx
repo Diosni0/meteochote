@@ -177,7 +177,7 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
               <span>Lluvia</span>
             </button>
 
-            <button
+<button
               onClick={() => handleSelectVariable('wind_speed')}
               aria-pressed={activeVariable === 'wind_speed'}
               className={`flex items-center gap-1 px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -190,7 +190,20 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
               <span>Viento</span>
             </button>
 
-            {/* Layer Toggle Button */}
+            {/* Radar tab (independent, first-class) */}
+            <div className="w-px h-6 bg-slate-700/60 mx-0.5" aria-hidden="true" />
+            <button
+              onClick={() => setShowRadar(prev => !prev)}
+              aria-pressed={showRadar}
+              className={`flex items-center gap-1 px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                showRadar
+                  ? 'bg-gradient-to-r from-cyan-500 to-sky-500 text-white shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-300/40'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Radar className="w-3.5 h-3.5" />
+              <span>Radar</span>
+            </button>
             <button
               onClick={() => setShowLayerControl(prev => !prev)}
               aria-label="Capas"
@@ -259,22 +272,11 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
                     aria-pressed={showWindParticles}
                     className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-all"
                   >
-                    <span className="flex items-center gap-1.5">
+<span className="flex items-center gap-1.5">
                       <Wind className="w-3.5 h-3.5 text-cyan-400" />
                       <span>Viento animado (Windy)</span>
                     </span>
                     {showWindParticles ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
-                  </button>
-                  <button
-                    onClick={() => setShowRadar(prev => !prev)}
-                    aria-pressed={showRadar}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-all"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Radar className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Radar de lluvia (observación)</span>
-                    </span>
-                    {showRadar ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
                   </button>
                 </div>
               </div>

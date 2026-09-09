@@ -24,9 +24,9 @@ export const ModelInfoModal: React.FC<ModelInfoModalProps> = ({ isOpen, onClose 
             <Sparkles className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">Modelos Meteorológicos de IA (reales)</h2>
+            <h2 className="text-xl font-bold text-white">Modelos Meteorológicos (IA reales)</h2>
             <p className="text-xs text-slate-400">
-              Previsiones reales de redes neuronales operativas, servidas vía Open-Meteo
+              3 redes neuronales operativas + 1 modelo físico de alta resolución, servidos vía Open-Meteo
             </p>
           </div>
         </div>
@@ -59,6 +59,33 @@ export const ModelInfoModal: React.FC<ModelInfoModalProps> = ({ isOpen, onClose 
             </p>
           </div>
 
+          {/* Google WeatherNext 2 */}
+          <div className="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-bold text-sm text-amber-300">Google WeatherNext 2</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-semibold">Google WN2</span>
+            </div>
+            <p className="text-slate-300 leading-relaxed">
+              Modelo de previsión por IA de Google DeepMind basado en la arquitectura FGN. Se sirve
+              como ensemble de 64 miembros: el valor que se muestra es la media del conjunto, que
+              además representa la incertidumbre. Resolución de 25 km con horizonte de hasta 15 días,
+              actualizado cada 12 horas (runs 00/12 UTC).
+            </p>
+          </div>
+
+          {/* AROME France HD */}
+          <div className="p-4 rounded-2xl bg-pink-950/30 border border-pink-500/30">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-bold text-sm text-pink-300">AROME France HD</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 font-semibold">AROME HD</span>
+            </div>
+            <p className="text-slate-300 leading-relaxed">
+              Modelo físico (no IA) de Météo-France a 1,3 km de resolución, de los más detallados de
+              Europa. Incluido como referencia de alta resolución para relieves y costas; su alcance
+              es de uno a dos días y su dominio cubre Francia y buena parte de España.
+            </p>
+          </div>
+
           {/* Data source callout */}
           <div className="p-4 rounded-2xl bg-slate-800/80 border border-slate-700">
             <div className="font-semibold text-white text-xs mb-1 flex items-center gap-1.5">
@@ -66,10 +93,11 @@ export const ModelInfoModal: React.FC<ModelInfoModalProps> = ({ isOpen, onClose 
               <span>De dónde salen los datos</span>
             </div>
             <p className="text-slate-400 leading-relaxed text-[11px]">
-              Ambos modelos se consultan en directo contra la API gratuita de Open-Meteo, sin clave
-              ni registro. Los mapas del panel son interpolaciones de 39 puntos de referencia
-              (península, Baleares y Canarias); no son radares. Cuando los dos modelos divergen,
-              la incertidumbre de la previsión es mayor: compáralos en la pestaña «Comparativa IA».
+              Todos los modelos se consultan en directo contra la API gratuita de Open-Meteo, sin
+              clave ni registro. Los mapas del panel son interpolaciones de 39 puntos de referencia
+              (península, Baleares y Canarias) con AIFS y AIGFS; no son radares. La comparativa por
+              localidad incluye también WeatherNext 2 y AROME HD. La pestaña Radar muestra la
+              observación real de lluvia (RainViewer) y el Nowcast la extrapolación a 15 minutos.
             </p>
           </div>
 

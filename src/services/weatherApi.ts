@@ -1,11 +1,13 @@
 import axios from 'axios';
-import { ForecastResponse, LocationItem, SpainOverviewResponse, SpainStation, WeatherModelId } from '../types';
+import { ForecastResponse, LocationItem, NowcastData, SpainOverviewResponse, SpainStation, WeatherModelId } from '../types';
 
 const API_BASE = '/api';
 
-// Real AI weather models served by Open-Meteo (free for non-commercial use, no API key):
+// Weather models served by Open-Meteo (free for non-commercial use, no API key):
 // - ecmwf_aifs025_single: ECMWF AIFS 0.25° (Artificial Intelligence Forecasting System, single run)
 // - ncep_aigfs025: NOAA NCEP AIGFS 0.25° (AI Global Forecast System, GraphCast-based)
+// - google_weathernext2_ensemble: Google DeepMind WeatherNext 2 (64-member ensemble, 15 días)
+// - meteofrance_arome_france_hd: Météo-France AROME HD 1.3 km (referencia de alta resolución, ~2 días)
 export const AI_MODELS: Array<{
   id: WeatherModelId;
   om: string;
@@ -33,10 +35,38 @@ export const AI_MODELS: Array<{
     badge: 'NOAA AIGFS',
     color: '#8b5cf6',
   },
+  {
+    id: 'google_weathernext2',
+    om: 'google_weathernext2_ensemble',
+    name: 'Google WeatherNext 2',
+    developer: 'Google DeepMind',
+    architecture: 'FGN (ensemble de 64 miembros) · horizonte 15 días',
+    badge: 'Google WN2',
+    color: '#f59e0b',
+  },
+  {
+    id: 'arome',
+    om: 'meteofrance_arome_france_hd',
+    name: 'AROME France HD',
+    developer: 'Météo-France',
+    architecture: 'Modelo físico de alta resolución (1.3 km)',
+    badge: 'AROME HD',
+    color: '#ec4899',
+  },
 ];
 
-const MODEL_IDS = AI_MODELS.map((m) => m.id);
-const MODELS_PARAM = ['best_match', ...AI_MODELS.map((m) => m.om)].join(',');
+// Models rendered on the Spain map (the 39-station overview). WeatherNext 2's 64
+// ensemble members and AROME's short lead time make them unsuitable for the map
+// batch: WN2 would multiply the response size ~65x per station and AROME covers
+// only a few days. They stay available in the per-location comparison instead.
+export const MAP_MODELS = AI_MODELS.filter((m) => m.id === 'ecmwf_aifs' || m.id === 'ncep_aigfs');
+const MAP_MODELS_PARAM = ['best_match', ...MAP_MODELS.map((m) => m.om)].join(',');
+
+// On /v1/forecast, WeatherNext 2 returns empty arrays (its data only comes from
+// the dedicated ensemble endpoint), so it is requested separately below.
+const WEATHERNEXT2 = AI_MODELS.find((m) => m.id === 'google_weathernext2')!;
+const FORECAST_MODELS = AI_MODELS.filter((m) => m.id !== 'google_weathernext2');
+const FORECAST_MODELS_PARAM = ['best_match', ...FORECAST_MODELS.map((m) => m.om)].join(',');
 const HOURLY_VARS = 'temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code';
 const DAILY_VARS = 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max';
 
@@ -59,7 +89,9 @@ const buildModelSeries = (hourly: any, omModel: string) => ({
 let cachedOverview: SpainOverviewResponse | null = null;
 let cachedOverviewTime = 0;
 const forecastCache = new Map<string, { data: ForecastResponse; time: number }>();
+const nowcastCache = new Map<string, { data: NowcastData; time: number }>();
 const CACHE_TTL = 15 * 60 * 1000;
+const NOWCAST_CACHE_TTL = 10 * 60 * 1000;
 
 const num = (value: any, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 
@@ -119,10 +151,19 @@ export const getForecastDirect = async (lat: number, lon: number): Promise<Forec
     return cached.data;
   }
 
-  const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&daily=${DAILY_VARS}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,weather_code&models=${MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
+  const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&daily=${DAILY_VARS}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,weather_code&models=${FORECAST_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
 
   const omRes = await axios.get(openMeteoUrl, { timeout: 12000 });
   const omData = omRes.data;
+
+  // WeatherNext 2 comes from the dedicated ensemble endpoint (base keys, no suffix)
+  let wn2Hourly: any = {};
+  try {
+    const ensUrl = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&forecast_days=7&models=${WEATHERNEXT2.om}&timezone=Europe%2FMadrid`;
+    wn2Hourly = (await axios.get(ensUrl, { timeout: 12000 })).data?.hourly || {};
+  } catch (err) {
+    console.error('Error fetching WeatherNext 2:', err);
+  }
 
   const baseTemp = pickSeries(omData.hourly, 'temperature_2m');
   const baseWindDir = pickSeries(omData.hourly, 'wind_direction_10m');
@@ -132,8 +173,10 @@ export const getForecastDirect = async (lat: number, lon: number): Promise<Forec
 
   const models = Object.fromEntries(
     AI_MODELS.map((m) => {
-      const series = buildModelSeries(omData.hourly, m.om);
-      const windDirection = pickSeries(omData.hourly, 'wind_direction_10m', m.om);
+      const sourceHourly = m.id === WEATHERNEXT2.id ? wn2Hourly : omData.hourly;
+      const suffix = m.id === WEATHERNEXT2.id ? undefined : m.om;
+      const series = buildModelSeries(sourceHourly, suffix as string);
+      const windDirection = pickSeries(sourceHourly, 'wind_direction_10m', suffix);
       return [
         m.id,
         {
@@ -208,7 +251,7 @@ export const getSpainOverviewDirect = async (): Promise<SpainOverviewResponse> =
   const lats = SPAIN_STATIONS.map((s) => s.lat).join(',');
   const lons = SPAIN_STATIONS.map((s) => s.lon).join(',');
 
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${MAP_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
 
   const response = await axios.get(url, { timeout: 15000 });
   const dataList = Array.isArray(response.data) ? response.data : [response.data];
@@ -227,7 +270,7 @@ export const getSpainOverviewDirect = async (): Promise<SpainOverviewResponse> =
       weatherCodes: pickSeries(hourly, 'weather_code'),
       windDirections: pickSeries(hourly, 'wind_direction_10m'),
       models: Object.fromEntries(
-        AI_MODELS.map((m) => [m.id, buildModelSeries(hourly, m.om)])
+        MAP_MODELS.map((m) => [m.id, buildModelSeries(hourly, m.om)])
       ) as unknown as SpainStation['models'],
     };
   });
@@ -253,6 +296,44 @@ export const getSpainOverview = async (): Promise<SpainOverviewResponse> => {
     // Backend unavailable or 404 (static hosting) -> direct Open-Meteo fallback
   }
   return getSpainOverviewDirect();
+};
+
+// Direct client fallback for the 15-minute precipitation nowcast (radar/satellite
+// extrapolation, refreshed ~5-10 min by Open-Meteo)
+export const getNowcastDirect = async (lat: number, lon: number): Promise<NowcastData> => {
+  const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
+  const cached = nowcastCache.get(cacheKey);
+  if (cached && Date.now() - cached.time < NOWCAST_CACHE_TTL) {
+    return cached.data;
+  }
+
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&minutely_15=precipitation&forecast_minutely_15=120&timezone=Europe%2FMadrid`;
+  const response = await axios.get(url, { timeout: 10000 });
+  const minutely = response.data?.minutely_15 || {};
+
+  const payload: NowcastData = {
+    times: Array.isArray(minutely.time) ? minutely.time : [],
+    precipitation: Array.isArray(minutely.precipitation) ? minutely.precipitation : [],
+    generatedAt: new Date().toISOString(),
+  };
+
+  nowcastCache.set(cacheKey, { data: payload, time: Date.now() });
+  return payload;
+};
+
+export const getNowcast = async (lat: number, lon: number): Promise<NowcastData> => {
+  try {
+    const response = await axios.get(`${API_BASE}/nowcast`, {
+      params: { lat, lon },
+      timeout: 6000,
+    });
+    if (response.data && Array.isArray(response.data.times)) {
+      return response.data;
+    }
+  } catch (error) {
+    // Backend unavailable -> direct Open-Meteo fallback
+  }
+  return getNowcastDirect(lat, lon);
 };
 
 // Direct client fallback for location search

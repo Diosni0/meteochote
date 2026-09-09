@@ -1,6 +1,8 @@
 export type WeatherModelId =
   | 'ecmwf_aifs'
-  | 'ncep_aigfs';
+  | 'ncep_aigfs'
+  | 'google_weathernext2'
+  | 'arome';
 
 export type WeatherVariable = 'temperature' | 'precipitation' | 'wind_speed';
 
@@ -105,6 +107,12 @@ export interface HeatmapPoint {
   value: number;
   windDir?: number;
   windSpeed?: number;
+}
+
+export interface NowcastData {
+  times: string[];
+  precipitation: number[];
+  generatedAt: string;
 }
 
 export interface SpainOverviewResponse {

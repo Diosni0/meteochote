@@ -34,6 +34,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenInfo }) => {
                   <span className="text-slate-600">•</span>
                   <span className="font-medium text-purple-400">NOAA AIGFS</span>
                   <span className="text-slate-600">•</span>
+                  <span className="font-medium text-amber-400">Google WN2</span>
+                  <span className="text-slate-600">•</span>
+                  <span className="font-medium text-pink-400">AROME HD</span>
+                  <span className="text-slate-600">•</span>
                   <span>Datos reales vía Open-Meteo</span>
                 </div>
               </div>

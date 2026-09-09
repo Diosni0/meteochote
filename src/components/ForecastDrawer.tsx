@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { ForecastResponse, LocationItem, WeatherModelId, WeatherVariable } from '../types';
-import { getWeatherDescription } from '../services/weatherApi';
+import React, { useEffect, useState } from 'react';
+import { ForecastResponse, LocationItem, NowcastData, WeatherModelId } from '../types';
+import { getWeatherDescription, getNowcast } from '../services/weatherApi';
 import {
   X,
   Sparkles,
@@ -12,8 +12,7 @@ import {
   Droplets,
   ChevronDown,
   ChevronUp,
-  ExternalLink,
-  Layers,
+  Timer,
 } from 'lucide-react';
 
 interface ForecastDrawerProps {
@@ -26,6 +25,9 @@ interface ForecastDrawerProps {
   onSelectModel: (model: WeatherModelId) => void;
 }
 
+// Models that can be rendered on the Spain map (the 39-station overview serves only these)
+const DRAWER_MAP_MODELS: WeatherModelId[] = ['ecmwf_aifs', 'ncep_aigfs'];
+
 export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
   isOpen,
   onClose,
@@ -35,8 +37,29 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
   activeModel,
   onSelectModel,
 }) => {
-  const [activeTab, setActiveTab] = useState<'forecast7d' | 'modelCompare'>('forecast7d');
+  const [activeTab, setActiveTab] = useState<'forecast7d' | 'modelCompare' | 'nowcast'>('forecast7d');
   const [expandedDayIndex, setExpandedDayIndex] = useState<number | null>(0);
+  const [nowcastData, setNowcastData] = useState<NowcastData | null>(null);
+  const [nowcastLoading, setNowcastLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'nowcast') return;
+    let cancelled = false;
+    setNowcastLoading(true);
+    getNowcast(location.latitude, location.longitude)
+      .then((data) => {
+        if (!cancelled) setNowcastData(data);
+      })
+      .catch((err) => {
+        console.error('Error cargando nowcast:', err);
+      })
+      .finally(() => {
+        if (!cancelled) setNowcastLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, activeTab, location]);
 
   if (!isOpen) return null;
 
@@ -115,23 +138,25 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {Object.values(forecastData.models).map((m) => {
-                  const isSelected = activeModel === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => onSelectModel(m.id)}
-                      className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-all flex items-center gap-2 ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 border border-blue-400/30'
-                          : 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border border-slate-700/60 hover:border-slate-600'
-                      }`}
-                    >
-                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
-                      <span className="truncate">{m.name}</span>
-                    </button>
-                  );
-                })}
+                {Object.values(forecastData.models)
+                  .filter((m) => DRAWER_MAP_MODELS.includes(m.id))
+                  .map((m) => {
+                    const isSelected = activeModel === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => onSelectModel(m.id)}
+                        className={`px-3 py-2 rounded-xl text-xs font-medium text-left transition-all flex items-center gap-2 ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 border border-blue-400/30'
+                            : 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border border-slate-700/60 hover:border-slate-600'
+                        }`}
+                      >
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: m.color }} />
+                        <span className="truncate">{m.name}</span>
+                      </button>
+                    );
+                  })}
               </div>
             </div>
 
@@ -158,6 +183,17 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
               >
                 <Cpu className="w-3.5 h-3.5 inline mr-1.5" />
                 <span>Comparativa IA</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('nowcast')}
+                className={`flex-1 py-2 rounded-lg font-semibold transition-all ${
+                  activeTab === 'nowcast'
+                    ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg shadow-cyan-600/20'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Timer className="w-3.5 h-3.5 inline mr-1.5" />
+                <span>Nowcast 15 min</span>
               </button>
             </div>
 
@@ -251,7 +287,7 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
             {activeTab === 'modelCompare' && (
               <div className="space-y-3.5 text-xs">
                 <div className="text-[11px] text-slate-400">
-                  Valores pronosticados por las distintas redes neuronales para las próximas 24 horas en {location.name}:
+                  Valores pronosticados por los distintos modelos para las próximas 24 horas en {location.name}:
                 </div>
 
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/60 overflow-hidden divide-y divide-slate-800 backdrop-blur-sm">
@@ -288,12 +324,48 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
                 <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-950/30 to-indigo-950/30 border border-blue-500/20 backdrop-blur-sm">
                   <div className="font-semibold text-blue-300 flex items-center gap-2 mb-1.5">
                     <Sparkles className="w-4 h-4 text-blue-400" />
-                    <span>Acuerdo entre modelos IA</span>
+                    <span>Acuerdo entre modelos</span>
                   </div>
                   <p className="text-[11px] text-slate-300">
-                    AIFS y AIGFS son redes neuronales independientes entrenadas con datos de
-                    reanálisis ERA5. Cuanto más coinciden, mayor confianza en la previsión; si
-                    divergen, hay incertidumbre atmosférica.
+                    AIFS, AIGFS y WeatherNext 2 son redes neuronales independientes (ECMWF, NOAA y Google
+                    DeepMind) entrenadas con reanálisis; AROME HD es el modelo físico de alta resolución
+                    de Météo-France. Cuanto más coinciden, mayor confianza en la previsión; si divergen,
+                    hay incertidumbre atmosférica.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 3: 15-MINUTE NOWCAST */}
+            {activeTab === 'nowcast' && (
+              <div className="space-y-3.5 text-xs">
+                <div className="text-[11px] text-slate-400">
+                  Precipitación estimada para {location.name} en pasos de 15 minutos (extrapolación de
+                  radar y satélite, actualizada cada ~10 minutos).
+                </div>
+
+                {nowcastLoading ? (
+                  <div className="py-12 text-center text-slate-400 space-y-2">
+                    <div className="w-7 h-7 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                    <div className="text-[11px]">Extrapolando radar y satélite...</div>
+                  </div>
+                ) : nowcastData && nowcastData.times.length ? (
+                  <NowcastPanel data={nowcastData} />
+                ) : (
+                  <div className="py-12 text-center text-[11px] text-slate-400">
+                    No hay datos de nowcast para este punto.
+                  </div>
+                )}
+
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/30 to-teal-950/30 border border-cyan-500/20 backdrop-blur-sm">
+                  <div className="font-semibold text-cyan-300 flex items-center gap-2 mb-1.5">
+                    <Timer className="w-4 h-4 text-cyan-400" />
+                    <span>¿Qué es el nowcast?</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300">
+                    Es la predicción inmediata (próximas horas) basada en la extrapolación de las últimas
+                    imágenes de radar y satélite de Open-Meteo. No es un modelo de IA: complementa la
+                    previsión a corto plazo con la observación en tiempo casi real.
                   </p>
                 </div>
               </div>
@@ -306,5 +378,72 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
         )}
       </div>
     </div>
+  );
+};
+
+// Bar panel with 15-minute precipitation steps. Shows the next 6 hours (24 steps)
+// as a scrollable strip plus an accumulated summary.
+const NowcastPanel: React.FC<{ data: NowcastData }> = ({ data }) => {
+  const steps = data.times.length;
+  const maxPrecip = Math.max(0.1, ...data.precipitation.map((v) => (Number.isFinite(v) ? v : 0)));
+
+  if (!steps) return null;
+
+  const finite = data.precipitation.filter((v) => Number.isFinite(v));
+  const total2h = Number(finite.slice(0, 8).reduce((a, b) => a + b, 0).toFixed(1));
+  const total6h = Number(finite.slice(0, 24).reduce((a, b) => a + b, 0).toFixed(1));
+  const anyRain = finite.some((v) => v > 0);
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div className="text-[10px] text-slate-400">Lluvia próximas 2 h</div>
+          <div className={`mt-0.5 font-bold ${total2h > 0 ? 'text-blue-400' : 'text-slate-500'}`}>
+            {total2h > 0 ? `${total2h} mm` : '0 mm'}
+          </div>
+        </div>
+        <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+          <div className="text-[10px] text-slate-400">Lluvia próximas 6 h</div>
+          <div className={`mt-0.5 font-bold ${total6h > 0 ? 'text-blue-400' : 'text-slate-500'}`}>
+            {total6h > 0 ? `${total6h} mm` : '0 mm'}
+          </div>
+        </div>
+      </div>
+
+      {!anyRain ? (
+        <div className="py-10 text-center rounded-2xl border border-slate-800 bg-slate-950/60 text-[11px] text-slate-400">
+          🌤️ Sin precipitación significativa prevista en las próximas 6 horas.
+        </div>
+      ) : (
+        <div className="flex gap-1.5 overflow-x-auto pb-2 no-scrollbar pt-1">
+          {data.times.slice(0, 24).map((t, idx) => {
+            const value = Number.isFinite(data.precipitation[idx]) ? data.precipitation[idx] : 0;
+            const pct = Math.max(4, Math.round((value / maxPrecip) * 100));
+            const active = value > 0;
+            return (
+              <div key={`${t}-${idx}`} className="flex flex-col items-center flex-shrink-0">
+                <div className="w-8 rounded-t-md flex items-end justify-center overflow-hidden" style={{ height: 64, background: 'rgba(2,6,23,0.6)' }}>
+                  <div
+                    className={`w-full ${active ? 'bg-gradient-to-t from-sky-700 to-cyan-400' : 'bg-slate-700/40'}`}
+                    style={{ height: `${pct}%` }}
+                    title={`${t}: ${value} mm`}
+                  />
+                </div>
+                <div className={`mt-0.5 text-[9px] font-mono ${active ? 'text-cyan-300 font-bold' : 'text-slate-500'}`}>
+                  {value.toFixed(1)}
+                </div>
+                <div className="text-[9px] text-slate-500 font-mono">{t.slice(11, 16)}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-[10px] text-slate-500">
+        Fuente: Open-Meteo (`minutely_15`) · {steps} pasos de 15 min hasta{' '}
+        {data.times[steps - 1]?.slice(11, 16)} h.
+      </p>
+    </>
   );
 };

@@ -3,11 +3,16 @@ import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
 import path from 'path';
+import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const distPath = path.join(__dirname, 'dist');
+// The same file runs from the repo root (`server/index.js`) and from the build
+// output (`dist/server/index.js`), so resolve the frontend dist relative to both.
+const localDist = path.join(__dirname, 'dist');
+const rootDist = path.join(__dirname, '..', 'dist');
+const distPath = existsSync(rootDist) ? rootDist : localDist;
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -59,14 +64,29 @@ const SPAIN_STATIONS = [
 ];
 
 // Real AI models available on Open-Meteo (free for non-commercial use, no API key):
-// - ecmwf_aifs025_single -> ECMWF AIFS 0.25°
-// - ncep_aigfs025        -> NOAA AIGFS 0.25° (GraphCast-based)
+// - ecmwf_aifs025_single          -> ECMWF AIFS 0.25°
+// - ncep_aigfs025                 -> NOAA AIGFS 0.25° (GraphCast-based)
+// - google_weathernext2_ensemble  -> Google DeepMind WeatherNext 2 (64-member ensemble, 15 días)
+// - meteofrance_arome_france_hd   -> Météo-France AROME HD 1.3 km (referencia de alta resolución)
 const AI_MODELS = [
   { id: 'ecmwf_aifs', om: 'ecmwf_aifs025_single', name: 'ECMWF AIFS 0.25°', developer: 'Centro Europeo (ECMWF)', architecture: 'Artificial Intelligence Forecasting System (single run)', badge: 'ECMWF AIFS', color: '#10b981' },
   { id: 'ncep_aigfs', om: 'ncep_aigfs025', name: 'NCEP AIGFS 0.25°', developer: 'NOAA (basado en GraphCast)', architecture: 'AI Global Forecast System (GraphCast-derived)', badge: 'NOAA AIGFS', color: '#8b5cf6' },
+  { id: 'google_weathernext2', om: 'google_weathernext2_ensemble', name: 'Google WeatherNext 2', developer: 'Google DeepMind', architecture: 'FGN (ensemble de 64 miembros) · horizonte 15 días', badge: 'Google WN2', color: '#f59e0b' },
+  { id: 'arome', om: 'meteofrance_arome_france_hd', name: 'AROME France HD', developer: 'Météo-France', architecture: 'Modelo físico de alta resolución (1.3 km)', badge: 'AROME HD', color: '#ec4899' },
 ];
 
-const MODELS_PARAM = ['best_match', ...AI_MODELS.map((m) => m.om)].join(',');
+// Models rendered on the Spain map. WeatherNext 2's 64 ensemble members would
+// bloat the 39-station batch request, and AROME only covers a few days, so the
+// map keeps AIFS + AIGFS while the per-location forecast serves all four.
+const MAP_MODELS = AI_MODELS.filter((m) => m.id === 'ecmwf_aifs' || m.id === 'ncep_aigfs');
+
+// On /v1/forecast, WeatherNext 2 returns empty arrays (its data only comes from
+// the dedicated ensemble endpoint), so it is requested separately below.
+const WEATHERNEXT2 = AI_MODELS.find((m) => m.id === 'google_weathernext2');
+const FORECAST_MODELS = AI_MODELS.filter((m) => m.id !== 'google_weathernext2');
+
+const MAP_MODELS_PARAM = ['best_match', ...MAP_MODELS.map((m) => m.om)].join(',');
+const FORECAST_MODELS_PARAM = ['best_match', ...FORECAST_MODELS.map((m) => m.om)].join(',');
 const HOURLY_VARS = 'temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code';
 const DAILY_VARS = 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max';
 
@@ -83,6 +103,8 @@ const num = (value, fallback) => (typeof value === 'number' && Number.isFinite(v
 // In-memory caches (15 min)
 const weatherCache = new Map();
 const CACHE_TTL = 15 * 60 * 1000;
+const nowcastCache = new Map();
+const NOWCAST_CACHE_TTL = 10 * 60 * 1000;
 let spainOverviewCache = null;
 let spainOverviewCacheTime = 0;
 
@@ -104,7 +126,7 @@ app.get('/api/spain-overview', async (req, res) => {
   const lons = SPAIN_STATIONS.map((s) => s.lon).join(',');
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${MAP_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
     const response = await axios.get(url, { timeout: 15000 });
     const dataList = Array.isArray(response.data) ? response.data : [response.data];
     const times = dataList[0]?.hourly?.time || [];
@@ -119,7 +141,7 @@ app.get('/api/spain-overview', async (req, res) => {
         lon: station.lon,
         weatherCodes: series(hourly, 'weather_code'),
         windDirections: series(hourly, 'wind_direction_10m'),
-        models: Object.fromEntries(AI_MODELS.map((m) => [m.id, {
+        models: Object.fromEntries(MAP_MODELS.map((m) => [m.id, {
           temp: series(hourly, 'temperature_2m', m.om),
           precip: series(hourly, 'precipitation', m.om),
           wind: series(hourly, 'wind_speed_10m', m.om),
@@ -153,9 +175,18 @@ app.get('/api/forecast', async (req, res) => {
   }
 
   try {
-    const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&daily=${DAILY_VARS}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,weather_code&models=${MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
+    const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&daily=${DAILY_VARS}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,weather_code&models=${FORECAST_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
     const omRes = await axios.get(openMeteoUrl, { timeout: 12000 });
     const omData = omRes.data;
+
+    // WeatherNext 2 comes from the dedicated ensemble endpoint (base keys, no suffix)
+    let wn2Hourly = {};
+    try {
+      const ensUrl = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&forecast_days=7&models=${WEATHERNEXT2.om}&timezone=Europe%2FMadrid`;
+      wn2Hourly = (await axios.get(ensUrl, { timeout: 12000 })).data?.hourly || {};
+    } catch (err) {
+      console.error('Error fetching WeatherNext 2:', err.message);
+    }
 
     const baseTemp = series(omData.hourly, 'temperature_2m');
     const current = omData.current || {};
@@ -215,22 +246,28 @@ app.get('/api/forecast', async (req, res) => {
         weatherCode: num(current.weather_code, 0),
       },
       times: baseTimes,
-      models: Object.fromEntries(AI_MODELS.map((m) => [m.id, {
-        id: m.id,
-        name: m.name,
-        developer: m.developer,
-        architecture: m.architecture,
-        badge: m.badge,
-        isLive: true,
-        color: m.color,
-        hourly: {
-          temperature: series(omData.hourly, 'temperature_2m', m.om),
-          precipitation: series(omData.hourly, 'precipitation', m.om),
-          precipitation_probability: [],
-          wind_speed: series(omData.hourly, 'wind_speed_10m', m.om),
-          wind_direction: series(omData.hourly, 'wind_direction_10m', m.om),
-        },
-      }])),
+      models: Object.fromEntries(AI_MODELS.map((m) => {
+        const sourceHourly = m.id === WEATHERNEXT2.id ? wn2Hourly : omData.hourly;
+        // On the ensemble endpoint the variables come suffixed only when several
+        // models are requested together; here they arrive with base names.
+        const suffix = m.id === WEATHERNEXT2.id ? undefined : m.om;
+        return [m.id, {
+          id: m.id,
+          name: m.name,
+          developer: m.developer,
+          architecture: m.architecture,
+          badge: m.badge,
+          isLive: true,
+          color: m.color,
+          hourly: {
+            temperature: series(sourceHourly, 'temperature_2m', suffix),
+            precipitation: series(sourceHourly, 'precipitation', suffix),
+            precipitation_probability: [],
+            wind_speed: series(sourceHourly, 'wind_speed_10m', suffix),
+            wind_direction: series(sourceHourly, 'wind_direction_10m', suffix),
+          },
+        }];
+      })),
       sevenDayForecast,
     };
 
@@ -239,6 +276,40 @@ app.get('/api/forecast', async (req, res) => {
   } catch (error) {
     console.error('Error fetching forecast data:', error.message);
     res.status(500).json({ error: 'Error al obtener la previsión meteorológica', details: error.message });
+  }
+});
+
+// 15-minute precipitation nowcast (radar/satellite extrapolation by Open-Meteo)
+app.get('/api/nowcast', async (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lon = parseFloat(req.query.lon);
+
+  if (isNaN(lat) || isNaN(lon)) {
+    return res.status(400).json({ error: 'Parámetros de latitud y longitud requeridos y numéricos' });
+  }
+
+  const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
+  const cached = nowcastCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < NOWCAST_CACHE_TTL)) {
+    return res.json(cached.data);
+  }
+
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&minutely_15=precipitation&forecast_minutely_15=120&timezone=Europe%2FMadrid`;
+    const omRes = await axios.get(url, { timeout: 10000 });
+    const minutely = omRes.data?.minutely_15 || {};
+
+    const payload = {
+      times: Array.isArray(minutely.time) ? minutely.time : [],
+      precipitation: Array.isArray(minutely.precipitation) ? minutely.precipitation : [],
+      generatedAt: new Date().toISOString(),
+    };
+
+    nowcastCache.set(cacheKey, { timestamp: Date.now(), data: payload });
+    res.json(payload);
+  } catch (error) {
+    console.error('Error fetching nowcast:', error.message);
+    res.status(500).json({ error: 'Error al obtener el nowcast', details: error.message });
   }
 });
 
@@ -285,5 +356,5 @@ app.get('*', (req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Backend de Meteochote (modelos IA reales: AIFS + AIGFS) en http://localhost:${PORT}`);
+  console.log(`Backend de Meteochote (modelos IA reales: AIFS + AIGFS + WeatherNext 2 + AROME HD) en http://localhost:${PORT}`);
 });
