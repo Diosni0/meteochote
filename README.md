@@ -58,6 +58,7 @@ Pruebas de interpolación y vectores de viento: `npm test` (Node.js 22.6 o poste
 3. **Comparativa de modelos**: Valores reales de AIFS, AIGFS, WeatherNext 2 (media del ensemble) y AROME HD para las próximas 24 horas lado a lado; cuando divergen, hay incertidumbre atmosférica.
 4. **Nowcast 15 min**: Precipitación con pasos de 15 minutos para las próximas horas (extrapolación de radar y satélite de Open-Meteo, actualizada cada ~10 min).
 5. **Previsión a 7 Días**: Tarjetas con rangos térmicos visuales, probabilidad de lluvia y viento máximo, con desglose horario expandible de 24 horas para cada día.
+6. **Convergencia de modelos**: Tarjeta de confianza (0-100 %) en la ficha de cada localidad que mide cuánto de acuerdo están AIFS, AIGFS, WeatherNext 2 y AROME (60 % acuerdo de temperatura + 40 % acuerdo de precipitación, hora a hora). Cuanto más convergen, más fiable la previsión; incluye desglose por horizonte (24 h, 48 h, resto de semana) y por día.
 
 ### Despliegue
 
