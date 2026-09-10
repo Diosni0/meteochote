@@ -321,7 +321,7 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
         </div>
       </div>
 
-      <section aria-label="Leyenda meteorológica" className="absolute bottom-48 sm:bottom-52 left-4 right-4 sm:right-auto sm:w-80 z-[1000] bg-slate-900/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-700/80 text-xs text-slate-200 shadow-xl pointer-events-none">
+      <section aria-label="Leyenda meteorológica" className="absolute bottom-48 xl:bottom-4 left-4 right-4 sm:right-auto sm:w-64 2xl:w-80 z-[1000] bg-slate-900/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-700/80 text-xs text-slate-200 shadow-xl pointer-events-none">
         <div className="flex justify-between gap-2 font-semibold">
           <span>{scale.label}{!overlayVisible && ' (oculta)'}</span>
           <span className="text-slate-400">{scale.unit}</span>
