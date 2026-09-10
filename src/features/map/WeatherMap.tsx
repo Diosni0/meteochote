@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, ZoomControl } from 'react-leaflet';
 import { LocationItem, SpainStation, WeatherModelId, WeatherVariable } from '../../types';
 import { useHeatmapData } from '../../hooks/useHeatmapData';
@@ -10,6 +10,9 @@ import { Radar } from 'lucide-react';
 import { createActivePinIcon } from './markers';
 import { FlyToCenter, MapEventsHandler, ZoomTracker } from './mapHandlers';
 import { StationLayer } from './StationLayer';
+
+// At overview zoom only these cities keep their markers as reference points
+const OVERVIEW_VISIBLE_STATIONS = new Set(['Valladolid', 'Sevilla']);
 
 interface WeatherMapProps {
   stations: SpainStation[];
@@ -57,6 +60,12 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
   const detailLevel = zoom < 6.5 ? 'low' : zoom < 9 ? 'mid' : 'high';
   const heatmapResolution = detailLevel === 'low' ? 32 : 48;
   const windDensity = detailLevel === 'low' ? 0.55 : 1;
+
+  // At overview zoom keep only Valladolid and Sevilla as visual references
+  const stationsForDetail = useMemo(
+    () => detailLevel === 'low' ? stations.filter((s) => OVERVIEW_VISIBLE_STATIONS.has(s.name)) : stations,
+    [detailLevel, stations]
+  );
 
   // Generate heatmap data based on stations and current variable
   const heatmapData = useHeatmapData(stations, activeModel, activeVariable, hourIndex);
@@ -180,8 +189,8 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
         <RadarLayer visible={showRadar} opacity={radarOpacity} />
 
         {/* Render Station Markers based on layer visibility and zoom */}
-        {showStations && detailLevel !== 'low' && <StationLayer
-          stations={stations}
+        {showStations && <StationLayer
+          stations={stationsForDetail}
           activeModel={activeModel}
           activeVariable={activeVariable}
           hourIndex={hourIndex}
