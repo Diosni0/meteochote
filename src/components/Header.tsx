@@ -28,6 +28,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenInfo }) => {
                   Modelos IA reales
                 </span>
               </div>
+              <div className="hidden sm:block text-[11px] sm:text-xs text-slate-400 italic mt-0.5">
+                meteorolog-IA para hombres de verdad
+              </div>
               <div className="hidden lg:flex items-center gap-2 mt-0.5">
                 <div className="flex items-center gap-1 text-[10px] text-slate-400 bg-slate-950/40 px-2 py-0.5 rounded-lg border border-slate-800/50">
                   <span className="font-medium text-emerald-400">ECMWF AIFS</span>
