@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { TileLayer } from 'react-leaflet';
-import { getRainViewerMeta, latestRadarTileUrl, RADAR_ATTRIBUTION } from '../services/radar';
+import { getRainViewerMeta, latestRadarTileUrl, RADAR_ATTRIBUTION } from '../../services/radar';
 
 interface RadarLayerProps {
   visible: boolean;

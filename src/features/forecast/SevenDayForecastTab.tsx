@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { DayForecast } from '../types';
-import { getWeatherDescription } from '../services/weatherApi';
+import { DayForecast } from '../../types';
+import { getWeatherDescription } from '../../services/weatherApi';
 import { CloudRain, Wind, ChevronDown, ChevronUp, Droplets, Calendar } from 'lucide-react';
 
 interface SevenDayForecastTabProps {

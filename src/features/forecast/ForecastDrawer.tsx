@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ForecastResponse, LocationItem, NowcastData, WeatherModelId } from '../types';
-import { getWeatherDescription, getNowcast } from '../services/weatherApi';
+import { ForecastResponse, LocationItem, NowcastData, WeatherModelId } from '../../types';
+import { getWeatherDescription, getNowcast } from '../../services/weatherApi';
 import { ConfidenceCard } from './ConfidenceCard';
 import {
   X,

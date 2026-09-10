@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
-import { WeatherMap } from './components/WeatherMap';
-import { ForecastDrawer } from './components/ForecastDrawer';
-import { TimelineBar } from './components/TimelineBar';
+import { WeatherMap } from './features/map/WeatherMap';
+import { ForecastDrawer } from './features/forecast/ForecastDrawer';
+import { TimelineBar } from './features/controls/TimelineBar';
 import { ModelInfoModal } from './components/ModelInfoModal';
+import { VariableSelector } from './features/controls/VariableSelector';
+import { ModelSelector } from './features/controls/ModelSelector';
+import { LayerControlPanel } from './features/controls/LayerControlPanel';
 import { getForecast, getSpainOverview } from './services/weatherApi';
 import {
   LocationItem,
@@ -14,15 +17,7 @@ import {
   WeatherVariable,
 } from './types';
 import {
-  Thermometer,
-  CloudRain,
-  Wind,
-  Sparkles,
-  Layers,
   Calendar,
-  Eye,
-  EyeOff,
-  Radar,
 } from 'lucide-react';
 
 const DEFAULT_LOCATION: LocationItem = {
@@ -162,138 +157,28 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
       <div className="relative flex-1 min-h-0 w-full overflow-hidden">
         {/* Floating Top Nav (Variables + Models + Search + Layer Control) */}
         <div className="absolute top-4 left-4 right-4 z-[1000] flex min-w-0 flex-col lg:flex-row items-center justify-between gap-2 lg:gap-3 pointer-events-none">
-          {/* Left: Weather Variable Selectors */}
-          <div className="pointer-events-auto w-full lg:w-auto lg:shrink-0 min-w-0 bg-slate-900/90 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl flex items-center justify-between gap-1">
-            <button
-              onClick={() => handleSelectVariable('temperature')}
-              aria-pressed={activeVariable === 'temperature'}
-              className={`flex items-center gap-1 px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                activeVariable === 'temperature'
-                  ? 'bg-gradient-to-r from-rose-500 to-rose-600 text-white shadow-lg shadow-rose-500/30 ring-2 ring-rose-400/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <Thermometer className="w-3.5 h-3.5" />
-              <span>Temperatura</span>
-            </button>
-
-            <button
-              onClick={() => handleSelectVariable('precipitation')}
-              aria-pressed={activeVariable === 'precipitation'}
-              className={`flex items-center gap-1 px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                activeVariable === 'precipitation'
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-600/30 ring-2 ring-blue-400/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <CloudRain className="w-3.5 h-3.5" />
-              <span>Lluvia</span>
-            </button>
-
-<button
-              onClick={() => handleSelectVariable('wind_speed')}
-              aria-pressed={activeVariable === 'wind_speed'}
-              className={`flex items-center gap-1 px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                activeVariable === 'wind_speed'
-                  ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/30 ring-2 ring-teal-400/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <Wind className="w-3.5 h-3.5" />
-              <span>Viento</span>
-            </button>
-
-            {/* Radar tab (independent, first-class) */}
-            <div className="w-px h-6 bg-slate-700/60 mx-0.5" aria-hidden="true" />
-            <button
-              onClick={() => setShowRadar(prev => !prev)}
-              aria-pressed={showRadar}
-              className={`flex items-center gap-1 px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                showRadar
-                  ? 'bg-gradient-to-r from-cyan-500 to-sky-500 text-white shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-300/40'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <Radar className="w-3.5 h-3.5" />
-              <span>Radar</span>
-            </button>
-            <button
-              onClick={() => setShowLayerControl(prev => !prev)}
-              aria-label="Capas"
-              aria-expanded={showLayerControl}
-              aria-controls="map-layer-controls"
-              className={`px-2 lg:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                showLayerControl
-                  ? 'bg-slate-700 text-white'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Capas</span>
-            </button>
-          </div>
+{/* Left: Weather Variable Selectors */}
+          <VariableSelector
+            activeVariable={activeVariable}
+            onSelectVariable={handleSelectVariable}
+            showRadar={showRadar}
+            onToggleRadar={() => setShowRadar(prev => !prev)}
+            showLayerControl={showLayerControl}
+            onToggleLayerControl={() => setShowLayerControl(prev => !prev)}
+          />
 
           {/* Layer Control Panel (visible on toggle) */}
           {showLayerControl && (
-            <div id="map-layer-controls" role="region" aria-labelledby="map-layer-title" className="absolute top-12 lg:top-16 left-0 z-[1001] w-full max-w-[320px] pointer-events-auto">
-              <div className="bg-slate-900/98 backdrop-blur-xl p-4 rounded-2xl border border-slate-700/80 shadow-2xl">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 id="map-layer-title" className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-blue-400" />
-                    Capas Meteorológicas
-                  </h3>
-                </div>
-                <p className="mb-3 text-xs leading-relaxed text-slate-400">
-                  Se muestra una sola variable a la vez. Usa los botones de temperatura, lluvia o viento para cambiar el gradiente.
-                </p>
-                <div className="space-y-3">
-                  <button
-                    onClick={() => setOverlayVisible(prev => !prev)}
-                    aria-pressed={overlayVisible}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-all"
-                  >
-                    <span>Ver gradiente</span>
-                    {overlayVisible ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
-                  </button>
-                  <div className="px-1">
-                    <label htmlFor="overlay-opacity" className="flex items-center justify-between text-xs font-semibold text-slate-200 mb-2">
-                      <span>Opacidad del gradiente</span>
-                      <span>{Math.round(overlayOpacity * 100)}%</span>
-                    </label>
-                    <input
-                      id="overlay-opacity"
-                      type="range"
-                      min={0.15}
-                      max={0.9}
-                      step={0.05}
-                      value={overlayOpacity}
-                      onChange={(event) => setOverlayOpacity(Number(event.target.value))}
-                      aria-valuetext={`${Math.round(overlayOpacity * 100)}%`}
-                      className="block w-full h-5 accent-blue-500 cursor-pointer"
-                    />
-                  </div>
-                  <button
-                    onClick={() => setShowStations(prev => !prev)}
-                    aria-pressed={showStations}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-all"
-                  >
-                    <span>Ver estaciones</span>
-                    {showStations ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
-</button>
-                  <button
-                    onClick={() => setShowWindParticles(prev => !prev)}
-                    aria-pressed={showWindParticles}
-                    className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-all"
-                  >
-<span className="flex items-center gap-1.5">
-                      <Wind className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Viento animado (Windy)</span>
-                    </span>
-                    {showWindParticles ? <Eye className="w-3.5 h-3.5 text-green-400" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
-                  </button>
-                </div>
-              </div>
-            </div>
+            <LayerControlPanel
+              overlayVisible={overlayVisible}
+              onToggleOverlay={() => setOverlayVisible(prev => !prev)}
+              overlayOpacity={overlayOpacity}
+              onOverlayOpacityChange={setOverlayOpacity}
+              showStations={showStations}
+              onToggleStations={() => setShowStations(prev => !prev)}
+              showWindParticles={showWindParticles}
+              onToggleWind={() => setShowWindParticles(prev => !prev)}
+            />
           )}
 
           {/* Center: Municipal Search Bar */}
@@ -305,37 +190,8 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
             />
           </div>
 
-          {/* Right: AI Model Quick Selector */}
-          <div className="pointer-events-auto w-full min-w-0 lg:flex-1 overflow-x-auto bg-slate-900/90 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl flex items-center gap-1 text-xs">
-            <span className="shrink-0 text-[11px] font-semibold text-slate-400 px-2 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-              <span className="hidden lg:inline">Modelo:</span>
-            </span>
-
-            {[
-              { id: 'ecmwf_aifs', label: 'AIFS ECMWF', color: '#10b981' },
-              { id: 'ncep_aigfs', label: 'AIGFS NOAA', color: '#8b5cf6' },
-              { id: 'google_weathernext2', label: 'WN2 Google', color: '#f59e0b' },
-              { id: 'arome', label: 'AROME HD', color: '#ec4899' },
-            ].map((m) => {
-              const isSelected = activeModel === m.id;
-              return (
-                <button
-                  key={m.id}
-                  onClick={() => setActiveModel(m.id as WeatherModelId)}
-                  aria-pressed={isSelected}
-                  className={`shrink-0 whitespace-nowrap px-2.5 py-1.5 rounded-xl font-bold transition-all flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400/50'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: m.color }} />
-                  <span>{m.label}</span>
-                </button>
-              );
-            })}
-          </div>
+{/* Right: AI Model Quick Selector */}
+          <ModelSelector activeModel={activeModel} onSelectModel={handleSelectModel} />
         </div>
 
         {/* The Main Interactive Map */}

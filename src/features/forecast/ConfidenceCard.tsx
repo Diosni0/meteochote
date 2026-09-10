@@ -1,7 +1,7 @@
 import React from 'react';
 import { Gauge, Info } from 'lucide-react';
-import { computeModelConfidence, ModelConfidence, ModelSeriesLike } from '../lib/modelConfidence';
-import { ModelInfo, WeatherModelId } from '../types';
+import { computeModelConfidence, ModelConfidence, ModelSeriesLike } from '../../lib/modelConfidence';
+import { ModelInfo, WeatherModelId } from '../../types';
 
 interface ConfidenceCardProps {
   models: Readonly<Record<WeatherModelId, ModelInfo>>;

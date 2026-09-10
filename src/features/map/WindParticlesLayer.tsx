@@ -1,8 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { HeatmapPoint } from '../types';
-import { interpolateWindVector } from '../services/weatherLayers';
+import { HeatmapPoint } from '../../types';
+import { interpolateWindVector } from '../../services/weatherLayers';
 
 interface WindParticlesLayerProps {
   data: HeatmapPoint[];

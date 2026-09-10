@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { HeatmapPoint, WeatherVariable } from '../types';
-import { interpolateWeather, weatherColor } from '../services/weatherLayers';
+import { HeatmapPoint, WeatherVariable } from '../../types';
+import { interpolateWeather, weatherColor } from '../../services/weatherLayers';
 
 interface HeatmapLayerProps {
   data: HeatmapPoint[];
