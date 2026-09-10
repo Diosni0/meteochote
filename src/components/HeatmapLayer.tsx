@@ -28,7 +28,7 @@ export function HeatmapLayer({ data, opacity, visible, activeVariable }: Heatmap
     const WeatherTiles = L.GridLayer.extend({
       createTile(coords: L.Coords) {
         const canvas = document.createElement('canvas');
-        const resolution = 96; // 96x96 internal raster per 256px tile for high definition and fast 60fps render
+        const resolution = 48; // 48x48 internal raster per 256px tile (bilinear GPU upscale keeps it smooth at a fraction of the cost)
         canvas.width = resolution;
         canvas.height = resolution;
         canvas.style.width = '256px';
@@ -69,7 +69,7 @@ export function HeatmapLayer({ data, opacity, visible, activeVariable }: Heatmap
       noWrap: true,
       updateWhenIdle: false,
       updateWhenZooming: true,
-      keepBuffer: 6,
+      keepBuffer: 2,
     });
 
     layerRef.current = layer;

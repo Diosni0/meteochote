@@ -5,7 +5,7 @@ interface HeaderProps {
   onOpenInfo: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenInfo }) => {
+const HeaderBase: React.FC<HeaderProps> = ({ onOpenInfo }) => {
   return (
     <header className="border-b border-slate-800/60 bg-gradient-to-b from-slate-900/80 to-slate-900/40 backdrop-blur-xl sticky top-0 z-30 shadow-lg shadow-slate-950/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-4">
@@ -63,3 +63,5 @@ export const Header: React.FC<HeaderProps> = ({ onOpenInfo }) => {
     </header>
   );
 };
+
+export const Header = React.memo(HeaderBase);

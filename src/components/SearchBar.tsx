@@ -21,7 +21,7 @@ const POPULAR_LOCATIONS: Array<{ name: string; admin: string; lat: number; lon: 
   { name: 'Santiago de Compostela', admin: 'Galicia', lat: 42.8782, lon: -8.5448 },
 ];
 
-export const SearchBar: React.FC<SearchBarProps> = ({
+const SearchBarBase: React.FC<SearchBarProps> = ({
   onSelectLocation,
   currentLocationName,
 }) => {
@@ -191,3 +191,5 @@ export const SearchBar: React.FC<SearchBarProps> = ({
     </div>
   );
 };
+
+export const SearchBar = React.memo(SearchBarBase);

@@ -7,7 +7,7 @@ interface TimelineBarProps {
   onIndexChange: (action: number | ((prev: number) => number)) => void;
 }
 
-export const TimelineBar: React.FC<TimelineBarProps> = ({
+const TimelineBarBase: React.FC<TimelineBarProps> = ({
   times,
   currentIndex,
   onIndexChange,
@@ -180,3 +180,5 @@ return (
     </div>
   );
 };
+
+export const TimelineBar = React.memo(TimelineBarBase);

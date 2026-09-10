@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { WeatherMap } from './components/WeatherMap';
@@ -100,8 +100,8 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
     fetchForecast(currentLocation);
   }, [currentLocation]);
 
-  // Handle station click on the map
-  const handleSelectStation = (station: SpainStation) => {
+// Handle station click on the map
+  const handleSelectStation = useCallback((station: SpainStation) => {
     const newLoc: LocationItem = {
       id: station.id,
       name: station.name,
@@ -114,10 +114,10 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
     setCurrentLocation(newLoc);
     setIsDrawerOpen(true);
     setHasSelectedLocation(true);
-  };
+  }, []);
 
   // Handle map click anywhere
-  const handleSelectCoords = (lat: number, lon: number, name?: string) => {
+  const handleSelectCoords = useCallback((lat: number, lon: number, name?: string) => {
     const newLoc: LocationItem = {
       id: Math.random(),
       name: name || `Coordenadas (${lat.toFixed(2)}°, ${lon.toFixed(2)}°)`,
@@ -129,12 +129,22 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
     setCurrentLocation(newLoc);
     setIsDrawerOpen(true);
     setHasSelectedLocation(true);
-  };
+  }, []);
 
-  const handleSelectVariable = (variable: WeatherVariable) => {
+  const handleSelectVariable = useCallback((variable: WeatherVariable) => {
     setActiveVariable(variable);
     setOverlayVisible(true);
-  };
+  }, []);
+
+  const handleSelectLocation = useCallback((loc: LocationItem) => {
+    setCurrentLocation(loc);
+    setIsDrawerOpen(true);
+    setHasSelectedLocation(true);
+  }, []);
+
+  const handleCloseDrawer = useCallback(() => setIsDrawerOpen(false), []);
+  const handleSelectModel = useCallback((model: WeatherModelId) => setActiveModel(model), []);
+  const handleOpenInfo = useCallback(() => setIsInfoOpen(true), []);
 
   return (
     <div className="h-dvh w-full bg-slate-950 text-slate-100 flex flex-col overflow-hidden select-none relative">
@@ -146,7 +156,7 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
       </div>
 
       {/* Top Header */}
-      <Header onOpenInfo={() => setIsInfoOpen(true)} />
+      <Header onOpenInfo={handleOpenInfo} />
 
       {/* Floating Control Bar over the Map */}
       <div className="relative flex-1 min-h-0 w-full overflow-hidden">
@@ -289,12 +299,8 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
           {/* Center: Municipal Search Bar */}
           {/* Hide frequent-city pills here to leave room for the map's own controls. */}
           <div className="pointer-events-auto w-full min-w-0 lg:w-56 lg:shrink-0 xl:w-80 [&>div>div:last-child]:hidden">
-            <SearchBar
-onSelectLocation={(loc) => {
-                setCurrentLocation(loc);
-                setIsDrawerOpen(true);
-                setHasSelectedLocation(true);
-              }}
+<SearchBar
+              onSelectLocation={handleSelectLocation}
               currentLocationName={currentLocation.name}
             />
           </div>
@@ -352,21 +358,21 @@ overlayOpacity={overlayOpacity}
         />
 
         {/* Timeline Slider (Bottom Center) */}
-        <TimelineBar
+<TimelineBar
           times={timelineTimes}
           currentIndex={currentHourIndex}
-          onIndexChange={(idx) => setCurrentHourIndex(idx)}
+          onIndexChange={setCurrentHourIndex}
         />
 
         {/* Floating Forecast Drawer (Right Side) */}
-        <ForecastDrawer
+<ForecastDrawer
           isOpen={isDrawerOpen}
-          onClose={() => setIsDrawerOpen(false)}
+          onClose={handleCloseDrawer}
           location={currentLocation}
           forecastData={forecastData}
           loading={loadingForecast}
           activeModel={activeModel}
-          onSelectModel={(m) => setActiveModel(m)}
+          onSelectModel={handleSelectModel}
         />
 
 {/* Reopen Drawer Pill (only after the user picks a location) */}

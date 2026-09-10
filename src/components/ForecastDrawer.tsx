@@ -26,7 +26,7 @@ interface ForecastDrawerProps {
   onSelectModel: (model: WeatherModelId) => void;
 }
 
-export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
+const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
   isOpen,
   onClose,
   location,
@@ -445,3 +445,5 @@ const NowcastPanel: React.FC<{ data: NowcastData }> = ({ data }) => {
     </>
   );
 };
+
+export const ForecastDrawer = React.memo(ForecastDrawerBase);

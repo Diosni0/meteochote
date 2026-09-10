@@ -6,7 +6,7 @@ interface ModelInfoModalProps {
   onClose: () => void;
 }
 
-export const ModelInfoModal: React.FC<ModelInfoModalProps> = ({ isOpen, onClose }) => {
+const ModelInfoModalBase: React.FC<ModelInfoModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   return (
@@ -128,3 +128,5 @@ export const ModelInfoModal: React.FC<ModelInfoModalProps> = ({ isOpen, onClose 
     </div>
   );
 };
+
+export const ModelInfoModal = React.memo(ModelInfoModalBase);

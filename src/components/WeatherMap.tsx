@@ -128,7 +128,7 @@ const createActivePinIcon = () => {
 };
 
 // Station Layer Component - dynamically renders markers based on layer visibility
-const StationLayer: React.FC<{
+const StationLayerBase: React.FC<{
   stations: SpainStation[];
   activeModel: WeatherModelId;
   activeVariable: WeatherVariable;
@@ -212,6 +212,8 @@ const StationLayer: React.FC<{
   );
 };
 
+const StationLayer = React.memo(StationLayerBase);
+
 // Handles map clicks
 const MapEventsHandler: React.FC<{ onSelectCoords: (lat: number, lon: number) => void }> = ({ onSelectCoords }) => {
   useMapEvents({
@@ -234,7 +236,7 @@ const FlyToCenter: React.FC<{ center: [number, number] }> = ({ center }) => {
   return null;
 };
 
-export const WeatherMap: React.FC<WeatherMapProps> = ({
+const WeatherMapBase: React.FC<WeatherMapProps> = ({
   stations,
   activeModel,
   activeVariable,
@@ -418,3 +420,5 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
     </div>
   );
 };
+
+export const WeatherMap = React.memo(WeatherMapBase);
