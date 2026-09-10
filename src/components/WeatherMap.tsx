@@ -236,6 +236,19 @@ const FlyToCenter: React.FC<{ center: [number, number] }> = ({ center }) => {
   return null;
 };
 
+// Reports the current zoom so the map can scale detail level (render LOD)
+const ZoomTracker: React.FC<{ onZoomChange: (zoom: number) => void }> = ({ onZoomChange }) => {
+  const map = useMap();
+  useEffect(() => {
+    const handler = () => onZoomChange(map.getZoom());
+    map.on('zoomend', handler);
+    return () => {
+      map.off('zoomend', handler);
+    };
+  }, [map, onZoomChange]);
+  return null;
+};
+
 const WeatherMapBase: React.FC<WeatherMapProps> = ({
   stations,
   activeModel,
@@ -255,7 +268,14 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
   onSelectCoords,
 }) => {
   const [mapTheme, setMapTheme] = useState<'dark' | 'satellite'>('dark');
+  const [zoom, setZoom] = useState(6);
   const position: [number, number] = [currentLocation.latitude, currentLocation.longitude];
+
+  // Render Level of Detail: overview zoom ignores station labels and lightens the
+  // overlays; the farther you zoom in, the more detail is painted.
+  const detailLevel = zoom < 6.5 ? 'low' : zoom < 9 ? 'mid' : 'high';
+  const heatmapResolution = detailLevel === 'low' ? 32 : 48;
+  const windDensity = detailLevel === 'low' ? 0.55 : 1;
 
   // Generate heatmap data based on stations and current variable
   const heatmapData = useHeatmapData(stations, activeModel, activeVariable, hourIndex);
@@ -372,13 +392,14 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
           updateWhenZooming={false}
         />
         <FlyToCenter center={position} />
+        <ZoomTracker onZoomChange={setZoom} />
         <MapEventsHandler onSelectCoords={onSelectCoords} />
 
         {/* Radar de observación (RainViewer) - debajo del gradiente IA */}
         <RadarLayer visible={showRadar} opacity={radarOpacity} />
 
-        {/* Render Station Markers based on layer visibility */}
-        {showStations && <StationLayer
+        {/* Render Station Markers based on layer visibility and zoom */}
+        {showStations && detailLevel !== 'low' && <StationLayer
           stations={stations}
           activeModel={activeModel}
           activeVariable={activeVariable}
@@ -393,6 +414,7 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
           opacity={overlayOpacity}
           visible={overlayVisible}
           activeVariable={activeVariable}
+          resolution={heatmapResolution}
         />
 
         {/* Animated Wind Particle Streamlines Layer (Windy style) */}
@@ -400,6 +422,7 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
           data={heatmapData}
           visible={showWindParticles}
           opacity={0.85}
+          densityScale={windDensity}
         />
 
         {/* Active Pinpoint Marker */}

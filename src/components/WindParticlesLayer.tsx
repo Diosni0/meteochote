@@ -8,6 +8,7 @@ interface WindParticlesLayerProps {
   data: HeatmapPoint[];
   visible: boolean;
   opacity?: number;
+  densityScale?: number;
 }
 
 interface Particle {
@@ -34,6 +35,7 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
   data,
   visible,
   opacity = 0.85,
+  densityScale = 1,
 }) => {
   const map = useMap();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -108,9 +110,9 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
 
     updateCanvasSizeAndPosition();
 
-    // Particle count scaled to screen size (between 350 and 800)
+    // Particle count scaled to screen size (between 350 and 800), reduced at overview zoom
     const size = map.getSize();
-    const particleCount = Math.min(800, Math.max(350, Math.floor((size.x * size.y) / 1600)));
+    const particleCount = Math.max(200, Math.min(800, Math.floor(((size.x * size.y) / 1600) * densityScale)));
 
     const particles: Particle[] = [];
     for (let i = 0; i < particleCount; i++) {
@@ -307,7 +309,7 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
       }
       gridRef.current = null;
     };
-  }, [map, visible, opacity]);
+  }, [map, visible, opacity, densityScale]);
 
   return null;
 };

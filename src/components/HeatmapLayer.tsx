@@ -9,9 +9,10 @@ interface HeatmapLayerProps {
   opacity: number;
   visible: boolean;
   activeVariable: WeatherVariable;
+  resolution?: number;
 }
 
-export function HeatmapLayer({ data, opacity, visible, activeVariable }: HeatmapLayerProps) {
+export function HeatmapLayer({ data, opacity, visible, activeVariable, resolution = 48 }: HeatmapLayerProps) {
   const map = useMap();
   const layerRef = useRef<L.GridLayer | null>(null);
 
@@ -28,9 +29,9 @@ export function HeatmapLayer({ data, opacity, visible, activeVariable }: Heatmap
     const WeatherTiles = L.GridLayer.extend({
       createTile(coords: L.Coords) {
         const canvas = document.createElement('canvas');
-        const resolution = 48; // 48x48 internal raster per 256px tile (bilinear GPU upscale keeps it smooth at a fraction of the cost)
-        canvas.width = resolution;
-        canvas.height = resolution;
+        const res = resolution; // internal raster per 256px tile (bilinear GPU upscale keeps it smooth at a fraction of the cost)
+        canvas.width = res;
+        canvas.height = res;
         canvas.style.width = '256px';
         canvas.style.height = '256px';
         canvas.style.pointerEvents = 'none';
@@ -39,11 +40,11 @@ export function HeatmapLayer({ data, opacity, visible, activeVariable }: Heatmap
         const context = canvas.getContext('2d');
         if (!context) return canvas;
 
-        const image = context.createImageData(resolution, resolution);
-        const step = 256 / resolution;
+        const image = context.createImageData(res, res);
+        const step = 256 / res;
 
-        for (let y = 0; y < resolution; y++) {
-          for (let x = 0; x < resolution; x++) {
+        for (let y = 0; y < res; y++) {
+          for (let x = 0; x < res; x++) {
             const pixelX = coords.x * 256 + (x + 0.5) * step;
             const pixelY = coords.y * 256 + (y + 0.5) * step;
             const location = map.unproject(L.point(pixelX, pixelY), coords.z);
@@ -52,7 +53,7 @@ export function HeatmapLayer({ data, opacity, visible, activeVariable }: Heatmap
 
             const color = weatherColor(activeVariable, sample.value);
             color[3] = Math.round(color[3] * sample.coverage);
-            const pixelIndex = (y * resolution + x) * 4;
+            const pixelIndex = (y * res + x) * 4;
             image.data.set(color, pixelIndex);
           }
         }
@@ -79,7 +80,7 @@ export function HeatmapLayer({ data, opacity, visible, activeVariable }: Heatmap
       layer.remove();
       layerRef.current = null;
     };
-  }, [map, data, visible, activeVariable]);
+  }, [map, data, visible, activeVariable, resolution]);
 
   useEffect(() => {
     if (layerRef.current) {
