@@ -95,9 +95,9 @@ export const ModelInfoModal: React.FC<ModelInfoModalProps> = ({ isOpen, onClose 
             <p className="text-slate-400 leading-relaxed text-[11px]">
               Todos los modelos se consultan en directo contra la API gratuita de Open-Meteo, sin
               clave ni registro. Los mapas del panel son interpolaciones de 39 puntos de referencia
-              (península, Baleares y Canarias) con AIFS y AIGFS; no son radares. La comparativa por
-              localidad incluye también WeatherNext 2 y AROME HD. La pestaña Radar muestra la
-              observación real de lluvia (RainViewer) y el Nowcast la extrapolación a 15 minutos.
+              (península, Baleares y Canarias) con los cuatro modelos (AIFS · AIGFS · WeatherNext 2 ·
+              AROME); no son radares (AROME cubre ~48 h y no las Canarias). La pestaña Radar muestra
+              la observación real de lluvia (RainViewer) y el Nowcast la extrapolación a 15 minutos.
             </p>
           </div>
 

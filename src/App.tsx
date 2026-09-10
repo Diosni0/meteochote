@@ -309,6 +309,8 @@ onSelectLocation={(loc) => {
             {[
               { id: 'ecmwf_aifs', label: 'AIFS ECMWF', color: '#10b981' },
               { id: 'ncep_aigfs', label: 'AIGFS NOAA', color: '#8b5cf6' },
+              { id: 'google_weathernext2', label: 'WN2 Google', color: '#f59e0b' },
+              { id: 'arome', label: 'AROME HD', color: '#ec4899' },
             ].map((m) => {
               const isSelected = activeModel === m.id;
               return (

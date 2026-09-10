@@ -265,7 +265,9 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
   ).join(', ')})`;
   const status = overviewLoading
     ? 'Cargando capas meteorológicas...'
-    : overviewError || (!heatmapData.length ? 'Sin datos para esta capa y hora.' : null);
+    : overviewError || (!heatmapData.length
+        ? `Sin datos para ${activeModel === 'arome' ? 'AROME' : activeModel === 'google_weathernext2' ? 'WN2' : 'esta capa'} en esta hora.`
+        : null);
 
   // Basemap tiles remain below the meteorological raster
   const darkTileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
@@ -335,7 +337,7 @@ export const WeatherMap: React.FC<WeatherMapProps> = ({
             ))}
           </div>
         </>}
-        {status ? <p role="status" className="mt-2 text-amber-300">{status}</p> : <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Interpolación de modelos IA reales (AIFS · AIGFS) · {heatmapData.length} estaciones<span className="hidden sm:inline"> · Corrientes de viento animadas</span></p>}
+        {status ? <p role="status" className="mt-2 text-amber-300">{status}</p> : <p className="mt-1 text-[10px] leading-relaxed text-slate-400">Interpolación de modelos IA reales (AIFS · AIGFS · WN2 · AROME) · {heatmapData.length} estaciones<span className="hidden sm:inline"> · Corrientes de viento animadas</span></p>}
         {showRadar && (
           <div className="mt-2 border-t border-slate-700/70 pt-2">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold text-cyan-300">

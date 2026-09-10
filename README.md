@@ -7,7 +7,7 @@ Aplicación web interactiva en tiempo real para visualizar y comparar el tiempo 
 * 🤖 **Google WeatherNext 2** — Modelo de IA de Google DeepMind servido como ensemble de 64 miembros con horizonte de 15 días (`google_weathernext2_ensemble`)
 * 🗺️ **AROME France HD** — Modelo físico de alta resolución (1,3 km) de Météo-France como referencia para España (`meteofrance_arome_france_hd`)
 
-Todas las previsiones mostradas son datos reales de estos modelos; no hay valores sintéticos ni simulados. La previsión base de la pestaña de 7 días y las condiciones actuales proceden del *best match* de Open-Meteo. El mapa interpolado (39 puntos) usa AIFS y AIGFS; WeatherNext 2 y AROME HD aparecen en la comparativa por localidad.
+Todas las previsiones mostradas son datos reales de estos modelos; no hay valores sintéticos ni simulados. La previsión base de la pestaña de 7 días y las condiciones actuales proceden del *best match* de Open-Meteo. El mapa interpolado (39 puntos) muestra los cuatro modelos (AIFS, AIGFS, WeatherNext 2 y AROME HD); AROME tiene un alcance de ~48 h y no cubre las Canarias.
 
 ---
 

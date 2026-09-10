@@ -26,9 +26,6 @@ interface ForecastDrawerProps {
   onSelectModel: (model: WeatherModelId) => void;
 }
 
-// Models that can be rendered on the Spain map (the 39-station overview serves only these)
-const DRAWER_MAP_MODELS: WeatherModelId[] = ['ecmwf_aifs', 'ncep_aigfs'];
-
 export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
   isOpen,
   onClose,
@@ -139,9 +136,7 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {Object.values(forecastData.models)
-                  .filter((m) => DRAWER_MAP_MODELS.includes(m.id))
-                  .map((m) => {
+                {Object.values(forecastData.models).map((m) => {
                     const isSelected = activeModel === m.id;
                     return (
                       <button

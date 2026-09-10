@@ -75,18 +75,15 @@ const AI_MODELS = [
   { id: 'arome', om: 'meteofrance_arome_france_hd', name: 'AROME France HD', developer: 'Météo-France', architecture: 'Modelo físico de alta resolución (1.3 km)', badge: 'AROME HD', color: '#ec4899' },
 ];
 
-// Models rendered on the Spain map. WeatherNext 2's 64 ensemble members would
-// bloat the 39-station batch request, and AROME only covers a few days, so the
-// map keeps AIFS + AIGFS while the per-location forecast serves all four.
-const MAP_MODELS = AI_MODELS.filter((m) => m.id === 'ecmwf_aifs' || m.id === 'ncep_aigfs');
-
-// On /v1/forecast, WeatherNext 2 returns empty arrays (its data only comes from
-// the dedicated ensemble endpoint), so it is requested separately below.
+// Sky models served on the main Open-Meteo endpoint: AIFS + AIGFS + AROME.
+// WeatherNext 2 only exists on the dedicated ensemble endpoint, where the
+// response includes all 64 ensemble members, so it is fetched separately in
+// small chunks below and only the ensemble-mean base keys are read.
 const WEATHERNEXT2 = AI_MODELS.find((m) => m.id === 'google_weathernext2');
 const FORECAST_MODELS = AI_MODELS.filter((m) => m.id !== 'google_weathernext2');
 
-const MAP_MODELS_PARAM = ['best_match', ...MAP_MODELS.map((m) => m.om)].join(',');
 const FORECAST_MODELS_PARAM = ['best_match', ...FORECAST_MODELS.map((m) => m.om)].join(',');
+const WN2_CHUNK_SIZE = 13;
 const HOURLY_VARS = 'temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code';
 const DAILY_VARS = 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max';
 
@@ -126,13 +123,29 @@ app.get('/api/spain-overview', async (req, res) => {
   const lons = SPAIN_STATIONS.map((s) => s.lon).join(',');
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${MAP_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
-    const response = await axios.get(url, { timeout: 15000 });
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${FORECAST_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
+    const response = await axios.get(url, { timeout: 20000 });
     const dataList = Array.isArray(response.data) ? response.data : [response.data];
     const times = dataList[0]?.hourly?.time || [];
 
+    // WeatherNext 2 via the ensemble endpoint in chunks (each batch response
+    // carries all 64 members, so chunking keeps every request small). We only
+    // read the ensemble-mean base keys.
+    const wn2ByStation = new Array(SPAIN_STATIONS.length).fill({});
+    await Promise.all(
+      Array.from({ length: Math.ceil(SPAIN_STATIONS.length / WN2_CHUNK_SIZE) }, (_, c) => {
+        const slice = SPAIN_STATIONS.slice(c * WN2_CHUNK_SIZE, (c + 1) * WN2_CHUNK_SIZE);
+        const ensUrl = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${slice.map((s) => s.lat).join(',')}&longitude=${slice.map((s) => s.lon).join(',')}&hourly=${HOURLY_VARS}&forecast_days=7&models=${WEATHERNEXT2.om}&timezone=Europe%2FMadrid`;
+        return axios.get(ensUrl, { timeout: 25000 }).then((ensRes) => {
+          const list = Array.isArray(ensRes.data) ? ensRes.data : [ensRes.data];
+          list.forEach((d, i) => { wn2ByStation[c * WN2_CHUNK_SIZE + i] = d?.hourly || {}; });
+        });
+      })
+    ).catch((err) => console.error('Error fetching WeatherNext 2 overview:', err.message));
+
     const stations = SPAIN_STATIONS.map((station, idx) => {
       const hourly = dataList[idx]?.hourly || {};
+      const wn2Hourly = wn2ByStation[idx] || {};
       return {
         id: station.id,
         name: station.name,
@@ -141,11 +154,18 @@ app.get('/api/spain-overview', async (req, res) => {
         lon: station.lon,
         weatherCodes: series(hourly, 'weather_code'),
         windDirections: series(hourly, 'wind_direction_10m'),
-        models: Object.fromEntries(MAP_MODELS.map((m) => [m.id, {
-          temp: series(hourly, 'temperature_2m', m.om),
-          precip: series(hourly, 'precipitation', m.om),
-          wind: series(hourly, 'wind_speed_10m', m.om),
-        }])),
+        models: Object.fromEntries([
+          ...FORECAST_MODELS.map((m) => [m.id, {
+            temp: series(hourly, 'temperature_2m', m.om),
+            precip: series(hourly, 'precipitation', m.om),
+            wind: series(hourly, 'wind_speed_10m', m.om),
+          }]),
+          [WEATHERNEXT2.id, {
+            temp: series(wn2Hourly, 'temperature_2m'),
+            precip: series(wn2Hourly, 'precipitation'),
+            wind: series(wn2Hourly, 'wind_speed_10m'),
+          }],
+        ]),
       };
     });
 

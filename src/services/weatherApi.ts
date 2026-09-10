@@ -55,18 +55,14 @@ export const AI_MODELS: Array<{
   },
 ];
 
-// Models rendered on the Spain map (the 39-station overview). WeatherNext 2's 64
-// ensemble members and AROME's short lead time make them unsuitable for the map
-// batch: WN2 would multiply the response size ~65x per station and AROME covers
-// only a few days. They stay available in the per-location comparison instead.
-export const MAP_MODELS = AI_MODELS.filter((m) => m.id === 'ecmwf_aifs' || m.id === 'ncep_aigfs');
-const MAP_MODELS_PARAM = ['best_match', ...MAP_MODELS.map((m) => m.om)].join(',');
-
-// On /v1/forecast, WeatherNext 2 returns empty arrays (its data only comes from
-// the dedicated ensemble endpoint), so it is requested separately below.
+// The Spain map serves the four AI models (see server/index.js): AIFS + AIGFS + AROME
+// come from /v1/forecast, while WeatherNext 2 only exists on the ensemble endpoint,
+// where the response carries all 64 members, so it is fetched in separate chunks
+// (only the ensemble-mean base keys are read).
 const WEATHERNEXT2 = AI_MODELS.find((m) => m.id === 'google_weathernext2')!;
 const FORECAST_MODELS = AI_MODELS.filter((m) => m.id !== 'google_weathernext2');
 const FORECAST_MODELS_PARAM = ['best_match', ...FORECAST_MODELS.map((m) => m.om)].join(',');
+const WN2_CHUNK_SIZE = 13;
 const HOURLY_VARS = 'temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,weather_code';
 const DAILY_VARS = 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max';
 
@@ -79,7 +75,7 @@ const pickSeries = (hourly: any, variable: string, omModel?: string): number[] =
   return Array.isArray(series) ? series : [];
 };
 
-const buildModelSeries = (hourly: any, omModel: string) => ({
+const buildModelSeries = (hourly: any, omModel?: string) => ({
   temperature: pickSeries(hourly, 'temperature_2m', omModel),
   precip: pickSeries(hourly, 'precipitation', omModel),
   wind: pickSeries(hourly, 'wind_speed_10m', omModel),
@@ -251,15 +247,31 @@ export const getSpainOverviewDirect = async (): Promise<SpainOverviewResponse> =
   const lats = SPAIN_STATIONS.map((s) => s.lat).join(',');
   const lons = SPAIN_STATIONS.map((s) => s.lon).join(',');
 
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${MAP_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${FORECAST_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
 
-  const response = await axios.get(url, { timeout: 15000 });
+  const response = await axios.get(url, { timeout: 20000 });
   const dataList = Array.isArray(response.data) ? response.data : [response.data];
   const times: string[] = dataList[0]?.hourly?.time || [];
+
+  // WeatherNext 2 via the ensemble endpoint in chunks (each batch response
+  // carries all 64 members, so chunking keeps every request small). Only the
+  // ensemble-mean base keys are read.
+  const wn2ByStation: Record<string, any>[] = SPAIN_STATIONS.map(() => ({}));
+  await Promise.all(
+    Array.from({ length: Math.ceil(SPAIN_STATIONS.length / WN2_CHUNK_SIZE) }, (_, c) => {
+      const slice = SPAIN_STATIONS.slice(c * WN2_CHUNK_SIZE, (c + 1) * WN2_CHUNK_SIZE);
+      const ensUrl = `https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${slice.map((s) => s.lat).join(',')}&longitude=${slice.map((s) => s.lon).join(',')}&hourly=${HOURLY_VARS}&forecast_days=7&models=${WEATHERNEXT2.om}&timezone=Europe%2FMadrid`;
+      return axios.get(ensUrl, { timeout: 25000 }).then((ensRes) => {
+        const list = Array.isArray(ensRes.data) ? ensRes.data : [ensRes.data];
+        list.forEach((d: any, i: number) => { wn2ByStation[c * WN2_CHUNK_SIZE + i] = d?.hourly || {}; });
+      });
+    })
+  ).catch((err) => console.error('Error fetching WeatherNext 2 overview:', err.message));
 
   const stations: SpainStation[] = SPAIN_STATIONS.map((station, idx) => {
     const item = dataList[idx] || {};
     const hourly = item.hourly || {};
+    const wn2Hourly = wn2ByStation[idx] || {};
 
     return {
       id: station.id,
@@ -269,9 +281,10 @@ export const getSpainOverviewDirect = async (): Promise<SpainOverviewResponse> =
       lon: station.lon,
       weatherCodes: pickSeries(hourly, 'weather_code'),
       windDirections: pickSeries(hourly, 'wind_direction_10m'),
-      models: Object.fromEntries(
-        MAP_MODELS.map((m) => [m.id, buildModelSeries(hourly, m.om)])
-      ) as unknown as SpainStation['models'],
+      models: Object.fromEntries([
+        ...FORECAST_MODELS.map((m) => [m.id, buildModelSeries(hourly, m.om)]),
+        [WEATHERNEXT2.id, buildModelSeries(wn2Hourly, undefined)],
+      ]) as unknown as SpainStation['models'],
     };
   });
 
