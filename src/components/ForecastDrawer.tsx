@@ -201,7 +201,6 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
             {/* TAB 1: 7-DAY FORECAST */}
             {activeTab === 'forecast7d' && (
               <div className="space-y-2.5">
-                <ConfidenceCard models={forecastData.models} locationName={location.name} />
                 {forecastData.sevenDayForecast.map((day, idx) => {
                   const isExpanded = expandedDayIndex === idx;
                   const dayCondition = getWeatherDescription(day.weatherCode);
@@ -282,6 +281,8 @@ export const ForecastDrawer: React.FC<ForecastDrawerProps> = ({
                     </div>
                   );
                 })}
+
+                <ConfidenceCard models={forecastData.models} locationName={location.name} />
               </div>
             )}
 
