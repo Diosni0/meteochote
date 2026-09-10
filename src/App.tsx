@@ -50,6 +50,7 @@ export const App: React.FC = () => {
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
+  const [hasSelectedLocation, setHasSelectedLocation] = useState<boolean>(false);
   
   // Map overlay controls
   const [overlayVisible, setOverlayVisible] = useState<boolean>(true);
@@ -112,6 +113,7 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
     };
     setCurrentLocation(newLoc);
     setIsDrawerOpen(true);
+    setHasSelectedLocation(true);
   };
 
   // Handle map click anywhere
@@ -126,6 +128,7 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
     };
     setCurrentLocation(newLoc);
     setIsDrawerOpen(true);
+    setHasSelectedLocation(true);
   };
 
   const handleSelectVariable = (variable: WeatherVariable) => {
@@ -287,9 +290,10 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
           {/* Hide frequent-city pills here to leave room for the map's own controls. */}
           <div className="pointer-events-auto w-full min-w-0 lg:w-56 lg:shrink-0 xl:w-80 [&>div>div:last-child]:hidden">
             <SearchBar
-              onSelectLocation={(loc) => {
+onSelectLocation={(loc) => {
                 setCurrentLocation(loc);
                 setIsDrawerOpen(true);
+                setHasSelectedLocation(true);
               }}
               currentLocationName={currentLocation.name}
             />
@@ -363,8 +367,8 @@ overlayOpacity={overlayOpacity}
           onSelectModel={(m) => setActiveModel(m)}
         />
 
-        {/* Reopen Drawer Pill (if closed) */}
-        {!isDrawerOpen && (
+{/* Reopen Drawer Pill (only after the user picks a location) */}
+        {!isDrawerOpen && hasSelectedLocation && (
           <button
             onClick={() => setIsDrawerOpen(true)}
             className="absolute top-64 lg:top-36 left-4 lg:left-auto lg:right-4 max-w-[calc(100%-5rem)] z-[1000] bg-slate-900/95 backdrop-blur-xl px-4 py-2.5 rounded-2xl border border-slate-700/80 shadow-2xl text-xs font-bold text-white hover:bg-blue-600 transition-all flex items-center gap-2"
