@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface TimelineBarProps {
   times: string[];
@@ -45,21 +45,63 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
     offsetLabel = days > 0 ? `+${days}d ${remH}h` : `+${offsetHours}h`;
   }
 
-  return (
-    <div className="absolute bottom-4 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[620px] z-[1000] bg-gradient-to-b from-slate-900/95 to-slate-900/80 backdrop-blur-xl border border-slate-700/90 rounded-3xl shadow-2xl p-4 text-slate-100 flex flex-col gap-3 animate-fade-in">
-      {/* Top Header info */}
-      <div className="flex items-center justify-between text-xs">
-        <div className="flex items-center gap-1 sm:gap-3">
-          <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-700/50 backdrop-blur-sm">
-            <Clock className="w-4 h-4 text-blue-400" />
-            <span className="font-bold text-white text-xs sm:text-sm">{formattedDate}</span>
-          </div>
-          <span className="font-mono text-blue-400 font-bold text-sm bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-3 py-1.5 rounded-xl border border-blue-500/20 backdrop-blur-sm">
+return (
+    <div className="absolute bottom-4 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[680px] z-[1000] bg-gradient-to-b from-slate-900/95 to-slate-900/80 backdrop-blur-xl border border-slate-700/90 rounded-2xl shadow-2xl px-3 py-2 text-slate-100 flex flex-col gap-2 animate-fade-in">
+      {/* Top Row: info + quick jumps */}
+      <div className="flex items-center justify-between text-[10px] gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-mono text-blue-400 font-bold text-[11px] bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-2 py-0.5 rounded-lg border border-blue-500/20 backdrop-blur-sm">
             {formattedHour}
           </span>
+          <span className="hidden sm:inline text-slate-300 font-medium whitespace-nowrap">{formattedDate}</span>
         </div>
 
-        <div className={`hidden sm:block px-3 py-1.5 rounded-xl text-[11px] font-semibold backdrop-blur-sm border ${
+        <div className="hidden md:flex items-center gap-2 text-slate-400">
+          <button
+            onClick={() => { setIsPlaying(false); onIndexChange(0); }}
+            className="hover:text-blue-400 transition-colors font-medium"
+          >
+            Inicio
+          </button>
+          <button
+            onClick={() => { setIsPlaying(false); onIndexChange(12); }}
+            className="hover:text-blue-400 transition-colors"
+          >
+            +12h
+          </button>
+          <button
+            onClick={() => { setIsPlaying(false); onIndexChange(24); }}
+            className="hover:text-blue-400 transition-colors"
+          >
+            +24h
+          </button>
+          <button
+            onClick={() => { setIsPlaying(false); onIndexChange(48); }}
+            className="hover:text-blue-400 transition-colors"
+          >
+            +48h
+          </button>
+          <button
+            onClick={() => { setIsPlaying(false); onIndexChange(72); }}
+            className="hover:text-blue-400 transition-colors"
+          >
+            +3 días
+          </button>
+          <button
+            onClick={() => { setIsPlaying(false); onIndexChange(120); }}
+            className="hover:text-blue-400 transition-colors"
+          >
+            +5 días
+          </button>
+          <button
+            onClick={() => { setIsPlaying(false); onIndexChange(maxIndex); }}
+            className="hover:text-blue-400 transition-colors font-medium"
+          >
+            Final
+          </button>
+        </div>
+
+        <div className={`hidden sm:block px-2 py-0.5 rounded-lg text-[10px] font-semibold backdrop-blur-sm border ${
           offsetLabel === 'Inicio previsión'
             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
             : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
@@ -68,19 +110,19 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
         </div>
       </div>
 
-      {/* Main slider */}
-      <div className="flex items-center gap-3">
+      {/* Main Row: play + slider + steppers */}
+      <div className="flex items-center gap-2">
         {/* Play/Pause Button */}
         <button
           onClick={() => setIsPlaying(!isPlaying)}
-          className={`w-12 h-12 rounded-2xl transition-all flex items-center justify-center backdrop-blur-sm border ${
+          className={`w-9 h-9 shrink-0 rounded-xl transition-all flex items-center justify-center backdrop-blur-sm border ${
             isPlaying
               ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 border-amber-400/30'
               : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 border-blue-400/30'
           }`}
           title={isPlaying ? 'Pausar animación' : 'Reproducir animación temporal'}
         >
-          {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
+          {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
         </button>
 
         {/* Range Slider */}
@@ -95,16 +137,16 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
               setIsPlaying(false);
               onIndexChange(parseInt(e.target.value));
             }}
-            className="w-full h-2.5 bg-gradient-to-r from-slate-800 to-slate-900 rounded-full appearance-none cursor-pointer accent-transparent focus:outline-none relative z-10"
+            className="w-full h-2 bg-gradient-to-r from-slate-800 to-slate-900 rounded-full appearance-none cursor-pointer accent-transparent focus:outline-none relative z-10"
             style={{
               backgroundImage: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((currentIndex + 0.5) / (maxIndex + 1)) * 100}%, #1e293b ${((currentIndex + 0.5) / (maxIndex + 1)) * 100}%, #1e293b 100%)`,
             }}
           />
           {/* Custom thumb */}
           <div 
-            className="absolute w-5 h-5 bg-white rounded-full shadow-lg pointer-events-none z-20"
+            className="absolute w-4 h-4 bg-white rounded-full shadow-lg pointer-events-none z-20"
             style={{ 
-              left: `calc(${((currentIndex / maxIndex) * 100)}% - 10px)`
+              left: `calc(${((currentIndex / maxIndex) * 100)}% - 8px)`
             }}
           >
             <div className="w-full h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full animate-pulse" />
@@ -112,13 +154,13 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
         </div>
 
         {/* Steppers */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => {
               setIsPlaying(false);
               onIndexChange(Math.max(0, currentIndex - 1));
             }}
-            className="w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all flex items-center justify-center border border-slate-700/50"
+            className="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all flex items-center justify-center border border-slate-700/50"
             title="-1 hora"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -128,58 +170,12 @@ export const TimelineBar: React.FC<TimelineBarProps> = ({
               setIsPlaying(false);
               onIndexChange(Math.min(maxIndex, currentIndex + 1));
             }}
-            className="w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all flex items-center justify-center border border-slate-700/50"
+            className="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-all flex items-center justify-center border border-slate-700/50"
             title="+1 hora"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
-      </div>
-
-      {/* Quick Jump Shortcuts */}
-      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/60">
-        <button
-          onClick={() => { setIsPlaying(false); onIndexChange(0); }}
-          className="hover:text-blue-400 transition-colors font-medium"
-        >
-           Inicio
-        </button>
-        <button
-          onClick={() => { setIsPlaying(false); onIndexChange(12); }}
-          className="hover:text-blue-400 transition-colors"
-        >
-          +12h
-        </button>
-        <button
-          onClick={() => { setIsPlaying(false); onIndexChange(24); }}
-          className="hover:text-blue-400 transition-colors"
-        >
-           +24h
-        </button>
-        <button
-          onClick={() => { setIsPlaying(false); onIndexChange(48); }}
-          className="hover:text-blue-400 transition-colors"
-        >
-          +48h
-        </button>
-        <button
-          onClick={() => { setIsPlaying(false); onIndexChange(72); }}
-          className="hover:text-blue-400 transition-colors"
-        >
-          +3 días
-        </button>
-        <button
-          onClick={() => { setIsPlaying(false); onIndexChange(120); }}
-          className="hover:text-blue-400 transition-colors"
-        >
-          +5 días
-        </button>
-        <button
-          onClick={() => { setIsPlaying(false); onIndexChange(maxIndex); }}
-          className="hover:text-blue-400 transition-colors font-medium"
-        >
-           Final
-        </button>
       </div>
     </div>
   );
