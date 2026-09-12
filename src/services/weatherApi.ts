@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { ForecastResponse, LocationItem, NowcastData, SpainOverviewResponse, SpainStation, WeatherModelId } from '../types';
+import { currentHourStartIndex } from '../lib/madridTime';
+import { buildSevenDayForecast } from '../lib/sevenDayForecast';
 
 const API_BASE = '/api';
 
@@ -91,53 +93,7 @@ const NOWCAST_CACHE_TTL = 10 * 60 * 1000;
 
 const num = (value: any, fallback: number): number => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 
-const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-
-const buildSevenDayForecast = (omData: any, consensusTemp: number[]) => {
-  const dailyRaw = omData.daily || {};
-  const dailyDates = dailyRaw.time || [];
-  return dailyDates.slice(0, 7).map((dateStr: string, idx: number) => {
-    const dateObj = new Date(dateStr);
-    const dayName = dayNames[dateObj.getDay()];
-    const dayFormatted = `${dateObj.getDate()} de ${dateObj.toLocaleString('es-ES', { month: 'short' })}`;
-
-    const startH = idx * 24;
-    const endH = startH + 24;
-    // Daily aggregates come from best_match; hourly detail from the active AI models' consensus proxy (best_match)
-    const dayTemps = consensusTemp.slice(startH, endH).filter((v) => Number.isFinite(v));
-    const dayTimes = (omData.hourly?.time || []).slice(startH, endH);
-    const dayCodes = pickSeries(omData.hourly, 'weather_code').slice(startH, endH);
-    const dayPrecip = pickSeries(omData.hourly, 'precipitation').slice(startH, endH);
-
-    const maxTemp = dayTemps.length ? Math.max(...dayTemps) : num(dailyRaw.temperature_2m_max?.[idx], 25);
-    const minTemp = dayTemps.length ? Math.min(...dayTemps) : num(dailyRaw.temperature_2m_min?.[idx], 15);
-    const totalPrecip = Number(dayPrecip.filter((v) => Number.isFinite(v)).reduce((acc: number, v: number) => acc + v, 0).toFixed(1));
-    const precipProb = num(dailyRaw.precipitation_probability_max?.[idx], 0);
-    const weatherCode = num(dailyRaw.weather_code?.[idx], 0);
-
-    const hourlyDetail = dayTimes.map((t: string, hIndex: number) => ({
-      time: t.slice(11, 16),
-      temp: num(consensusTemp[startH + hIndex], 20),
-      precip: num(dayPrecip[hIndex], 0),
-      wind: num(pickSeries(omData.hourly, 'wind_speed_10m')[startH + hIndex], 10),
-      code: num(dayCodes[hIndex], weatherCode),
-    }));
-
-    return {
-      date: dateStr,
-      dayName,
-      dayFormatted,
-      isToday: idx === 0,
-      tempMax: maxTemp,
-      tempMin: minTemp,
-      precipitationSum: totalPrecip,
-      precipitationProbability: precipProb,
-      windSpeedMax: num(dailyRaw.wind_speed_10m_max?.[idx], 18),
-      weatherCode,
-      hourly: hourlyDetail,
-    };
-  });
-};
+const sliceAt = <T,>(arr: T[] | undefined, idx: number): T[] => (Array.isArray(arr) ? arr.slice(idx) : []);
 
 // Direct client fallback for single location detailed forecast
 export const getForecastDirect = async (lat: number, lon: number): Promise<ForecastResponse> => {
@@ -161,8 +117,18 @@ export const getForecastDirect = async (lat: number, lon: number): Promise<Forec
     console.error('Error fetching WeatherNext 2:', err);
   }
 
-  const baseTemp = pickSeries(omData.hourly, 'temperature_2m');
-  const baseWindDir = pickSeries(omData.hourly, 'wind_direction_10m');
+  // Trim the hourly axis so the forecast begins at the current hour instead
+  // of 00:00 of the day (index 0 = "ahora"). All hourly arrays share it.
+  const rawTimes: string[] = omData.hourly?.time || [];
+  const startIdx = currentHourStartIndex(rawTimes);
+  const trim = <T,>(arr: T[] | undefined): T[] => sliceAt(arr, startIdx);
+
+  const baseTimes = trim(rawTimes);
+  const baseTemp = trim(pickSeries(omData.hourly, 'temperature_2m'));
+  const basePrecip = trim(pickSeries(omData.hourly, 'precipitation'));
+  const baseWind = trim(pickSeries(omData.hourly, 'wind_speed_10m'));
+  const baseCodes = trim(pickSeries(omData.hourly, 'weather_code'));
+  const baseWindDir = trim(pickSeries(omData.hourly, 'wind_direction_10m'));
 
   const current = omData.current || {};
   const currentTemp = num(current.temperature_2m, 22);
@@ -184,11 +150,11 @@ export const getForecastDirect = async (lat: number, lon: number): Promise<Forec
           isLive: true,
           color: m.color,
           hourly: {
-            temperature: series.temperature,
-            precipitation: series.precip,
+            temperature: trim(series.temperature),
+            precipitation: trim(series.precip),
             precipitation_probability: [],
-            wind_speed: series.wind,
-            wind_direction: windDirection.length ? windDirection : baseWindDir,
+            wind_speed: trim(series.wind),
+            wind_direction: windDirection.length ? trim(windDirection) : baseWindDir,
           },
         },
       ];
@@ -212,9 +178,9 @@ export const getForecastDirect = async (lat: number, lon: number): Promise<Forec
       humidity: num(current.relative_humidity_2m, 55),
       weatherCode: num(current.weather_code, 0),
     },
-    times: omData.hourly?.time || [],
+    times: baseTimes,
     models,
-    sevenDayForecast: buildSevenDayForecast(omData, baseTemp),
+    sevenDayForecast: buildSevenDayForecast(omData, baseTemp, baseTimes, basePrecip, baseWind, baseCodes),
   };
 
   forecastCache.set(cacheKey, { data: payload, time: Date.now() });
@@ -251,7 +217,17 @@ export const getSpainOverviewDirect = async (): Promise<SpainOverviewResponse> =
 
   const response = await axios.get(url, { timeout: 20000 });
   const dataList = Array.isArray(response.data) ? response.data : [response.data];
-  const times: string[] = dataList[0]?.hourly?.time || [];
+  const rawTimes: string[] = dataList[0]?.hourly?.time || [];
+
+  // Trim the hourly axis so the forecast/map begins at the current hour,
+  // keeping every per-station array aligned with `times`.
+  const startIdx = currentHourStartIndex(rawTimes);
+  const times = sliceAt(rawTimes, startIdx);
+  const trim = <T,>(arr: T[] | undefined): T[] => sliceAt(arr, startIdx);
+  const buildTrimmedSeries = (sourceHourly: any, omModel?: string) => {
+    const s = buildModelSeries(sourceHourly, omModel);
+    return { temperature: trim(s.temperature), precip: trim(s.precip), wind: trim(s.wind) };
+  };
 
   // WeatherNext 2 via the ensemble endpoint in chunks (each batch response
   // carries all 64 members, so chunking keeps every request small). Only the
@@ -279,11 +255,11 @@ export const getSpainOverviewDirect = async (): Promise<SpainOverviewResponse> =
       admin: station.admin,
       lat: station.lat,
       lon: station.lon,
-      weatherCodes: pickSeries(hourly, 'weather_code'),
-      windDirections: pickSeries(hourly, 'wind_direction_10m'),
+      weatherCodes: trim(pickSeries(hourly, 'weather_code')),
+      windDirections: trim(pickSeries(hourly, 'wind_direction_10m')),
       models: Object.fromEntries([
-        ...FORECAST_MODELS.map((m) => [m.id, buildModelSeries(hourly, m.om)]),
-        [WEATHERNEXT2.id, buildModelSeries(wn2Hourly, undefined)],
+        ...FORECAST_MODELS.map((m) => [m.id, buildTrimmedSeries(hourly, m.om)]),
+        [WEATHERNEXT2.id, buildTrimmedSeries(wn2Hourly, undefined)],
       ]) as unknown as SpainStation['models'],
     };
   });

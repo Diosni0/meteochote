@@ -75,6 +75,28 @@ const series = (hourly, variable, omModel) => {
 
 const num = (value, fallback) => (typeof value === 'number' && Number.isFinite(value) ? value : fallback);
 
+// Open-Meteo's hourly forecast always starts at 00:00 of the current day
+// (Europe/Madrid), so the timeline would open at midnight. This returns the
+// index of the first hour that is in the future/now, so all hourly arrays can
+// be trimmed to begin at the current hour (index 0 = "ahora").
+const currentHourStartIndex = (times) => {
+  if (!Array.isArray(times) || times.length === 0) return 0;
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Madrid',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const get = (type) => (parts.find((p) => p.type === type) || {}).value || '';
+  const nowLabel = `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:00`;
+  const idx = times.findIndex((t) => t >= nowLabel);
+  return idx === -1 ? 0 : idx;
+};
+
+const sliceFrom = (arr, idx) => (Array.isArray(arr) ? arr.slice(idx) : []);
+
 // Warm-cache across invocations (best effort on serverless)
 let spainOverviewCache = null;
 let spainOverviewCacheTime = 0;
@@ -116,7 +138,13 @@ export default async function handler(req, res) {
       const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&hourly=${HOURLY_VARS}&models=${FORECAST_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
       const response = await axios.get(apiUrl, { timeout: 20000 });
       const dataList = Array.isArray(response.data) ? response.data : [response.data];
-      const times = dataList[0]?.hourly?.time || [];
+      const rawTimes = dataList[0]?.hourly?.time || [];
+
+      // Trim the hourly axis so the forecast/map begins at the current hour,
+      // keeping every per-station array aligned with `times`.
+      const startIdx = currentHourStartIndex(rawTimes);
+      const times = sliceFrom(rawTimes, startIdx);
+      const slice = (arr) => sliceFrom(arr, startIdx);
 
       // WeatherNext 2 via the ensemble endpoint in chunks (each batch response
       // carries all 64 members, so chunking keeps every request small). We only
@@ -142,18 +170,18 @@ export default async function handler(req, res) {
           admin: station.admin,
           lat: station.lat,
           lon: station.lon,
-          weatherCodes: series(hourly, 'weather_code'),
-          windDirections: series(hourly, 'wind_direction_10m'),
+          weatherCodes: slice(series(hourly, 'weather_code')),
+          windDirections: slice(series(hourly, 'wind_direction_10m')),
           models: Object.fromEntries([
             ...FORECAST_MODELS.map((m) => [m.id, {
-              temp: series(hourly, 'temperature_2m', m.om),
-              precip: series(hourly, 'precipitation', m.om),
-              wind: series(hourly, 'wind_speed_10m', m.om),
+              temp: slice(series(hourly, 'temperature_2m', m.om)),
+              precip: slice(series(hourly, 'precipitation', m.om)),
+              wind: slice(series(hourly, 'wind_speed_10m', m.om)),
             }]),
             [WEATHERNEXT2.id, {
-              temp: series(wn2Hourly, 'temperature_2m'),
-              precip: series(wn2Hourly, 'precipitation'),
-              wind: series(wn2Hourly, 'wind_speed_10m'),
+              temp: slice(series(wn2Hourly, 'temperature_2m')),
+              precip: slice(series(wn2Hourly, 'precipitation')),
+              wind: slice(series(wn2Hourly, 'wind_speed_10m')),
             }],
           ]),
         };
@@ -186,11 +214,17 @@ export default async function handler(req, res) {
         console.error('Error fetching WeatherNext 2:', err.message);
       }
 
-      const baseTemp = series(omData.hourly, 'temperature_2m');
-      const baseTimes = omData.hourly?.time || [];
-      const basePrecip = series(omData.hourly, 'precipitation');
-      const baseWind = series(omData.hourly, 'wind_speed_10m');
-      const baseCodes = series(omData.hourly, 'weather_code');
+      // Trim the hourly axis so the forecast begins at the current hour instead
+      // of 00:00 of the day (index 0 = "ahora"). All hourly arrays share it.
+      const rawTimes = omData.hourly?.time || [];
+      const startIdx = currentHourStartIndex(rawTimes);
+      const slice = (arr) => sliceFrom(arr, startIdx);
+
+      const baseTimes = slice(rawTimes);
+      const baseTemp = slice(series(omData.hourly, 'temperature_2m'));
+      const basePrecip = slice(series(omData.hourly, 'precipitation'));
+      const baseWind = slice(series(omData.hourly, 'wind_speed_10m'));
+      const baseCodes = slice(series(omData.hourly, 'weather_code'));
       const current = omData.current || {};
 
       const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -199,11 +233,13 @@ export default async function handler(req, res) {
 
       const sevenDayForecast = dailyDates.slice(0, 7).map((dateStr, idx) => {
         const dateObj = new Date(dateStr);
-        const startH = idx * 24;
-        const endH = startH + 24;
-        const dayTemps = baseTemp.slice(startH, endH).filter((v) => Number.isFinite(v));
+        // Day boundaries within the trimmed (current-hour onwards) hourly axis
+        let startH = baseTimes.findIndex((t) => t.slice(0, 10) === dateStr);
+        let endH = baseTimes.findIndex((t) => t.slice(0, 10) > dateStr);
+        if (endH === -1) endH = baseTimes.length;
+        const dayTemps = startH === -1 ? [] : baseTemp.slice(startH, endH).filter((v) => Number.isFinite(v));
 
-        const hourlyDetail = baseTimes.slice(startH, endH).map((t, hIndex) => ({
+        const hourlyDetail = startH === -1 ? [] : baseTimes.slice(startH, endH).map((t, hIndex) => ({
           time: t.slice(11, 16),
           temp: num(baseTemp[startH + hIndex], 20),
           precip: num(basePrecip[startH + hIndex], 0),
@@ -218,7 +254,7 @@ export default async function handler(req, res) {
           isToday: idx === 0,
           tempMax: dayTemps.length ? Math.max(...dayTemps) : num(dailyRaw.temperature_2m_max?.[idx], 25),
           tempMin: dayTemps.length ? Math.min(...dayTemps) : num(dailyRaw.temperature_2m_min?.[idx], 15),
-          precipitationSum: Number(basePrecip.slice(startH, endH).filter((v) => Number.isFinite(v)).reduce((acc, v) => acc + v, 0).toFixed(1)),
+          precipitationSum: startH === -1 ? 0 : Number(basePrecip.slice(startH, endH).filter((v) => Number.isFinite(v)).reduce((acc, v) => acc + v, 0).toFixed(1)),
           precipitationProbability: num(dailyRaw.precipitation_probability_max?.[idx], 0),
           windSpeedMax: num(dailyRaw.wind_speed_10m_max?.[idx], 18),
           weatherCode: num(dailyRaw.weather_code?.[idx], 0),
@@ -256,11 +292,11 @@ export default async function handler(req, res) {
             isLive: true,
             color: m.color,
             hourly: {
-              temperature: series(sourceHourly, 'temperature_2m', suffix),
-              precipitation: series(sourceHourly, 'precipitation', suffix),
+              temperature: slice(series(sourceHourly, 'temperature_2m', suffix)),
+              precipitation: slice(series(sourceHourly, 'precipitation', suffix)),
               precipitation_probability: [],
-              wind_speed: series(sourceHourly, 'wind_speed_10m', suffix),
-              wind_direction: series(sourceHourly, 'wind_direction_10m', suffix),
+              wind_speed: slice(series(sourceHourly, 'wind_speed_10m', suffix)),
+              wind_direction: slice(series(sourceHourly, 'wind_direction_10m', suffix)),
             },
           }];
         })),
