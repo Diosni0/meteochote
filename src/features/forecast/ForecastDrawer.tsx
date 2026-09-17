@@ -74,8 +74,21 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
 
   if (!isOpen) return null;
 
+  // Hero values follow the active model (its hour 0 = current hour). The models
+  // don't provide humidity/feels-like, so those stay observed (best-match).
+  const firstFinite = (arr: unknown): number | null => {
+    if (!Array.isArray(arr)) return null;
+    for (const v of arr) {
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+    }
+    return null;
+  };
+  const heroTemp = firstFinite(activeModelInfo?.hourly.temperature) ?? forecastData?.current.temperature ?? null;
+  const heroWind = firstFinite(activeModelInfo?.hourly.wind_speed) ?? forecastData?.current.windSpeed ?? null;
+  const heroCode = firstFinite(activeModelInfo?.hourly.weather_code) ?? forecastData?.current.weatherCode ?? -1;
+
   const currentCondition = forecastData
-    ? getWeatherDescription(forecastData.current.weatherCode)
+    ? getWeatherDescription(heroCode)
     : { text: 'Cargando...', icon: '🌤️' };
 
   return (
@@ -131,7 +144,7 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
             <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900/40 to-cyan-950/40 border border-blue-500/20 shadow-lg shadow-blue-900/20 flex items-center justify-between">
               <div>
                 <div className="text-3xl font-black text-white flex items-baseline">
-                  <span>{forecastData.current.temperature}</span>
+                  <span>{heroTemp ?? '—'}</span>
                   <span className="text-xl text-blue-400 font-bold ml-0.5">°C</span>
                 </div>
                 <div className="text-[11px] text-slate-400 mt-1">
@@ -142,7 +155,7 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
               <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
                 <div className="flex items-center gap-1.5 bg-slate-900/50 px-2 py-1 rounded-lg border border-slate-800/50">
                   <Wind className="w-3.5 h-3.5 text-teal-400" />
-                  <span>{forecastData.current.windSpeed} km/h</span>
+                  <span>{heroWind ?? '—'} km/h</span>
                 </div>
                 <div className="flex items-center gap-1.5 bg-slate-900/50 px-2 py-1 rounded-lg border border-slate-800/50">
                   <Droplets className="w-3.5 h-3.5 text-blue-400" />
