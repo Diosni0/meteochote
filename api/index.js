@@ -299,6 +299,7 @@ export default async function handler(req, res) {
               precipitation_probability: [],
               wind_speed: slice(series(sourceHourly, 'wind_speed_10m', suffix)),
               wind_direction: slice(series(sourceHourly, 'wind_direction_10m', suffix)),
+              weather_code: slice(series(sourceHourly, 'weather_code', suffix)),
             },
           }];
         })),

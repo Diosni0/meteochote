@@ -86,7 +86,7 @@ const buildModelSeries = (hourly: any, omModel?: string) => ({
 // In-memory cache for the client-side fallback (e.g. static hosting without backend)
 let cachedOverview: SpainOverviewResponse | null = null;
 let cachedOverviewTime = 0;
-const forecastCache = new Map<string, { data: ForecastResponse; time: number }>();
+const forecastCache = new Map<string, { data: ForecastResponse; time: number; ttl?: number }>();
 const nowcastCache = new Map<string, { data: NowcastData; time: number }>();
 const CACHE_TTL = 15 * 60 * 1000;
 const NOWCAST_CACHE_TTL = 10 * 60 * 1000;
@@ -99,7 +99,7 @@ const sliceAt = <T,>(arr: T[] | undefined, idx: number): T[] => (Array.isArray(a
 export const getForecastDirect = async (lat: number, lon: number): Promise<ForecastResponse> => {
   const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
   const cached = forecastCache.get(cacheKey);
-  if (cached && Date.now() - cached.time < CACHE_TTL) {
+  if (cached && Date.now() - cached.time < (cached.ttl ?? CACHE_TTL)) {
     return cached.data;
   }
 
@@ -155,6 +155,7 @@ export const getForecastDirect = async (lat: number, lon: number): Promise<Forec
             precipitation_probability: [],
             wind_speed: trim(series.wind),
             wind_direction: windDirection.length ? trim(windDirection) : baseWindDir,
+            weather_code: trim(pickSeries(sourceHourly, 'weather_code', suffix)),
           },
         },
       ];
@@ -183,7 +184,9 @@ export const getForecastDirect = async (lat: number, lon: number): Promise<Forec
     sevenDayForecast: buildSevenDayForecast(omData, baseTemp, baseTimes, basePrecip, baseWind, baseCodes),
   };
 
-  forecastCache.set(cacheKey, { data: payload, time: Date.now() });
+  // Don't let a failed model fetch poison the cache: retry it soon instead.
+  const ttl = Object.keys(wn2Hourly).length > 0 ? CACHE_TTL : 2 * 60 * 1000;
+  forecastCache.set(cacheKey, { data: payload, time: Date.now(), ttl });
   return payload;
 };
 

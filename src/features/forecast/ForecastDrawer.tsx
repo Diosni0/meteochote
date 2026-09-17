@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ForecastResponse, LocationItem, NowcastData, WeatherModelId } from '../../types';
 import { getWeatherDescription, getNowcast } from '../../services/weatherApi';
+import { buildModelDailyForecast } from '../../lib/modelDailyForecast';
 import { ConfidenceCard } from './ConfidenceCard';
 import {
   X,
@@ -39,6 +40,18 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
   const [expandedDayIndex, setExpandedDayIndex] = useState<number | null>(0);
   const [nowcastData, setNowcastData] = useState<NowcastData | null>(null);
   const [nowcastLoading, setNowcastLoading] = useState(false);
+
+  // Daily cards follow the active AI model (each model has its own hourly
+  // series), instead of always showing the best-match blend.
+  const activeModelInfo = forecastData?.models[activeModel];
+  const modelDaily = useMemo(
+    () => buildModelDailyForecast(forecastData?.times ?? [], activeModelInfo?.hourly),
+    [forecastData, activeModelInfo]
+  );
+  // Reset the expanded day when the model (and therefore the days) changes.
+  useEffect(() => {
+    setExpandedDayIndex(0);
+  }, [activeModel]);
 
   useEffect(() => {
     if (!isOpen || activeTab !== 'nowcast') return;
@@ -205,89 +218,115 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
               </button>
             </div>
 
-            {/* TAB 1: 7-DAY FORECAST */}
+            {/* TAB 1: 7-DAY FORECAST (follows the active AI model) */}
             {activeTab === 'forecast7d' && (
               <div className="space-y-2.5">
-                {forecastData.sevenDayForecast.map((day, idx) => {
-                  const isExpanded = expandedDayIndex === idx;
-                  const dayCondition = getWeatherDescription(day.weatherCode);
+                <div className="text-[11px] text-slate-400">
+                  Previsión por días de <span className="font-semibold text-slate-200">{activeModelInfo?.name ?? '—'}</span> para {location.name}.
+                </div>
+                {modelDaily.length === 0 ? (
+                  <div className="py-10 text-center rounded-2xl border border-slate-800 bg-slate-950/60 text-[11px] text-slate-400">
+                    Sin datos de este modelo para este punto. Prueba con otro modelo.
+                  </div>
+                ) : (
+                  modelDaily.map((day, idx) => {
+                    const isExpanded = expandedDayIndex === idx;
+                    const dayCondition = getWeatherDescription(day.weatherCode ?? -1);
 
-                  return (
-                    <div
-                      key={day.date}
-                      className={`rounded-xl border transition-all overflow-hidden ${
-                        isExpanded
-                          ? 'bg-gradient-to-br from-slate-800/95 to-slate-800/70 border-blue-500/40 shadow-lg shadow-blue-900/20'
-                          : 'bg-gradient-to-r from-slate-800/50 to-slate-800/30 hover:bg-slate-800/80 border-slate-800'
-                      }`}
-                    >
+                    if (!day.hasData) {
+                      return (
+                        <div
+                          key={day.date}
+                          className="rounded-xl border border-slate-800 bg-slate-900/40 p-3.5 text-xs"
+                        >
+                          <div className="font-bold text-white flex items-center gap-1.5">
+                            <span>{day.isToday ? 'Hoy' : day.dayName}</span>
+                            <span className="text-[10px] text-slate-400 font-normal">{day.dayFormatted}</span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-1">
+                            Sin cobertura de {activeModelInfo?.badge ?? 'este modelo'} aquí (su horizonte no alcanza este día).
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
                       <div
-                        onClick={() => setExpandedDayIndex(isExpanded ? null : idx)}
-                        className="p-3.5 flex items-center justify-between cursor-pointer select-none text-xs"
+                        key={day.date}
+                        className={`rounded-xl border transition-all overflow-hidden ${
+                          isExpanded
+                            ? 'bg-gradient-to-br from-slate-800/95 to-slate-800/70 border-blue-500/40 shadow-lg shadow-blue-900/20'
+                            : 'bg-gradient-to-r from-slate-800/50 to-slate-800/30 hover:bg-slate-800/80 border-slate-800'
+                        }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 shadow-sm">
-                            {dayCondition.icon}
-                          </div>
-                          <div>
-                            <div className="font-bold text-white flex items-center gap-1.5">
-                              <span>{day.isToday ? 'Hoy' : day.dayName}</span>
-                              <span className="text-[10px] text-slate-400 font-normal">{day.dayFormatted}</span>
+                        <div
+                          onClick={() => setExpandedDayIndex(isExpanded ? null : idx)}
+                          className="p-3.5 flex items-center justify-between cursor-pointer select-none text-xs"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 shadow-sm">
+                              {dayCondition.icon}
                             </div>
-                            <div className="text-[11px] text-slate-400">{dayCondition.text}</div>
+                            <div>
+                              <div className="font-bold text-white flex items-center gap-1.5">
+                                <span>{day.isToday ? 'Hoy' : day.dayName}</span>
+                                <span className="text-[10px] text-slate-400 font-normal">{day.dayFormatted}</span>
+                              </div>
+                              <div className="text-[11px] text-slate-400">{dayCondition.text}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            {day.precipitationSum > 0 && (
+                              <div className="flex items-center gap-1.5 text-[11px] text-blue-400 font-medium bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
+                                <CloudRain className="w-3 h-3" />
+                                <span>{day.precipitationSum} mm</span>
+                              </div>
+                            )}
+
+                            <div className="flex items-center gap-1.5 font-mono text-xs bg-slate-900/50 px-2.5 py-1 rounded-lg border border-slate-800/50">
+                              <span className="text-slate-400">{day.tempMin}°</span>
+                              <span className="text-slate-600">/</span>
+                              <span className="text-white font-bold">{day.tempMax}°</span>
+                            </div>
+
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4 text-blue-400" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 text-slate-500" />
+                            )}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                          {day.precipitationProbability > 20 && (
-                            <div className="flex items-center gap-1.5 text-[11px] text-blue-400 font-medium bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
-                              <CloudRain className="w-3 h-3" />
-                              <span>{day.precipitationProbability}%</span>
+                        {/* 24-hour carousel */}
+                        {isExpanded && (
+                          <div className="border-t border-slate-700/60 p-3 bg-gradient-to-b from-slate-950/80 to-slate-900/60">
+                            <div className="flex gap-2 overflow-x-auto pb-1 text-center no-scrollbar">
+                              {day.hourly.map((h, hIdx) => {
+                                const cond = getWeatherDescription(h.code);
+                                return (
+                                  <div
+                                    key={hIdx}
+                                    className="flex-shrink-0 w-14 p-2 rounded-xl bg-slate-900 border border-slate-800 text-[10px] hover:bg-slate-800 transition-colors"
+                                  >
+                                    <div className="text-slate-400 font-mono mb-1">{h.time}</div>
+                                    <div className="text-lg mb-1.5">{cond.icon}</div>
+                                    <div className="font-bold text-white">{h.temp}°</div>
+                                    {h.precip > 0 ? (
+                                      <div className="text-blue-400 font-semibold">{h.precip}m</div>
+                                    ) : (
+                                      <div className="text-slate-600">0</div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          )}
-
-                          <div className="flex items-center gap-1.5 font-mono text-xs bg-slate-900/50 px-2.5 py-1 rounded-lg border border-slate-800/50">
-                            <span className="text-slate-400">{day.tempMin}°</span>
-                            <span className="text-slate-600">/</span>
-                            <span className="text-white font-bold">{day.tempMax}°</span>
                           </div>
-
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-blue-400" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4 text-slate-500" />
-                          )}
-                        </div>
+                        )}
                       </div>
-
-                      {/* 24-hour carousel */}
-                      {isExpanded && (
-                        <div className="border-t border-slate-700/60 p-3 bg-gradient-to-b from-slate-950/80 to-slate-900/60">
-                          <div className="flex gap-2 overflow-x-auto pb-1 text-center no-scrollbar">
-                            {day.hourly.map((h, hIdx) => {
-                              const cond = getWeatherDescription(h.code);
-                              return (
-                                <div
-                                  key={hIdx}
-                                  className="flex-shrink-0 w-14 p-2 rounded-xl bg-slate-900 border border-slate-800 text-[10px] hover:bg-slate-800 transition-colors"
-                                >
-                                  <div className="text-slate-400 font-mono mb-1">{h.time}</div>
-                                  <div className="text-lg mb-1.5">{cond.icon}</div>
-                                  <div className="font-bold text-white">{h.temp}°</div>
-                                  {h.precip > 0 ? (
-                                    <div className="text-blue-400 font-semibold">{h.precip}m</div>
-                                  ) : (
-                                    <div className="text-slate-600">0</div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
 
                 <ConfidenceCard models={forecastData.models} locationName={location.name} />
               </div>

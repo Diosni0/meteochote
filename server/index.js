@@ -223,7 +223,7 @@ app.get('/api/forecast', async (req, res) => {
 
   const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
   const cached = weatherCache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+  if (cached && (Date.now() - cached.timestamp < (cached.ttl ?? CACHE_TTL))) {
     return res.json(cached.data);
   }
 
@@ -326,13 +326,17 @@ app.get('/api/forecast', async (req, res) => {
             precipitation_probability: [],
             wind_speed: slice(series(sourceHourly, 'wind_speed_10m', suffix)),
             wind_direction: slice(series(sourceHourly, 'wind_direction_10m', suffix)),
+            weather_code: slice(series(sourceHourly, 'weather_code', suffix)),
           },
         }];
       })),
       sevenDayForecast,
     };
 
-    weatherCache.set(cacheKey, { timestamp: Date.now(), data: payload });
+    // A failed model fetch (e.g. WeatherNext 2 timing out) must not poison the
+    // cache for 15 minutes: retry it soon instead.
+    const ttl = Object.keys(wn2Hourly).length > 0 ? CACHE_TTL : 2 * 60 * 1000;
+    weatherCache.set(cacheKey, { timestamp: Date.now(), ttl, data: payload });
     res.json(payload);
   } catch (error) {
     console.error('Error fetching forecast data:', error.message);

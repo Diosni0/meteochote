@@ -25,6 +25,8 @@ export interface HourlyModelSeries {
   precipitation_probability: number[];
   wind_speed: number[];
   wind_direction: number[];
+  // Per-model condition code (may be empty when the upstream endpoint omits it)
+  weather_code: number[];
 }
 
 export interface ModelInfo {
