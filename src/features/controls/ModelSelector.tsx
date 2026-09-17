@@ -16,7 +16,7 @@ const MODEL_OPTIONS: { id: WeatherModelId; label: string; color: string }[] = [
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ activeModel, onSelectModel }) => {
   return (
-    <div className="pointer-events-auto w-full min-w-0 lg:flex-1 overflow-x-auto bg-slate-900/90 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl flex items-center gap-1 text-xs">
+    <div className="pointer-events-auto w-full min-w-0 lg:flex-1 overflow-x-auto bg-slate-900/95 p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl flex items-center gap-1 text-xs">
       <span className="shrink-0 text-[11px] font-semibold text-slate-400 px-2 flex items-center gap-1">
         <Sparkles className="w-3.5 h-3.5 text-blue-400" />
         <span className="hidden lg:inline">Modelo:</span>

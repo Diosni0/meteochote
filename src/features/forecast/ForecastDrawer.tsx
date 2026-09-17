@@ -66,11 +66,11 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
     : { text: 'Cargando...', icon: '🌤️' };
 
   return (
-    <div className="absolute top-4 right-4 bottom-4 w-full sm:w-[440px] z-[1100] bg-gradient-to-b from-slate-900/98 to-slate-900/80 backdrop-blur-2xl border border-slate-700/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-fade-in">
+    <div className="absolute top-4 right-4 bottom-4 w-full sm:w-[440px] z-[1100] bg-slate-900/95 border border-slate-700/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-fade-in">
       {/* Drawer Header */}
-      <div className="p-4 border-b border-slate-800/60 flex items-start justify-between gap-3 bg-gradient-to-r from-slate-950/40 to-slate-900/40 backdrop-blur-sm">
+      <div className="p-4 border-b border-slate-800/60 flex items-start justify-between gap-3 bg-slate-950/40">
         <div className="flex items-start gap-3">
-          <div className="text-3xl p-2.5 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700/50 shadow-lg shadow-black/20 flex items-center justify-center animate-float">
+          <div className="text-3xl p-2.5 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl border border-slate-700/50 shadow-lg shadow-black/20 flex items-center justify-center">
             {currentCondition.icon}
           </div>
           <div>
@@ -94,8 +94,20 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {loading ? (
+      <div className="relative flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Stale-while-revalidate: keep the previous forecast visible and overlay
+            a subtle refresh hint instead of blanking the whole panel. */}
+        {loading && forecastData && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="sticky top-0 z-10 -mt-4 mb-2 flex items-center justify-center gap-2 border-b border-slate-800/60 bg-slate-950/80 px-3 py-1.5 text-[11px] font-medium text-blue-300"
+          >
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+            Actualizando previsión...
+          </div>
+        )}
+        {loading && !forecastData ? (
           <div className="py-24 text-center text-slate-400 space-y-2">
             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
             <div className="text-xs font-medium">Calculando predicción con redes neuronales...</div>
@@ -103,7 +115,7 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
         ) : forecastData ? (
           <>
             {/* Quick Hero Banner */}
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900/40 to-cyan-950/40 border border-blue-500/20 shadow-lg shadow-blue-900/20 flex items-center justify-between backdrop-blur-sm">
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900/40 to-cyan-950/40 border border-blue-500/20 shadow-lg shadow-blue-900/20 flex items-center justify-between">
               <div>
                 <div className="text-3xl font-black text-white flex items-baseline">
                   <span>{forecastData.current.temperature}</span>
@@ -157,7 +169,7 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
             </div>
 
             {/* Tab Navigation in Drawer */}
-            <div className="flex items-center gap-1 p-1.5 bg-slate-950/60 rounded-xl border border-slate-800/60 text-xs backdrop-blur-sm">
+            <div className="flex items-center gap-1 p-1.5 bg-slate-950/60 rounded-xl border border-slate-800/60 text-xs">
               <button
                 onClick={() => setActiveTab('forecast7d')}
                 className={`flex-1 py-2 rounded-lg font-semibold transition-all ${
@@ -214,7 +226,7 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
                         className="p-3.5 flex items-center justify-between cursor-pointer select-none text-xs"
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 shadow-sm ${isExpanded ? 'animate-float' : ''}`}>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 shadow-sm">
                             {dayCondition.icon}
                           </div>
                           <div>
@@ -250,7 +262,7 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
 
                       {/* 24-hour carousel */}
                       {isExpanded && (
-                        <div className="border-t border-slate-700/60 p-3 bg-gradient-to-b from-slate-950/80 to-slate-900/60 backdrop-blur-sm">
+                        <div className="border-t border-slate-700/60 p-3 bg-gradient-to-b from-slate-950/80 to-slate-900/60">
                           <div className="flex gap-2 overflow-x-auto pb-1 text-center no-scrollbar">
                             {day.hourly.map((h, hIdx) => {
                               const cond = getWeatherDescription(h.code);
@@ -288,7 +300,7 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
                   Valores pronosticados por los distintos modelos para las próximas 24 horas en {location.name}:
                 </div>
 
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 overflow-hidden divide-y divide-slate-800 backdrop-blur-sm">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 overflow-hidden divide-y divide-slate-800">
                   {Object.values(forecastData.models).map((m) => {
                     const next24Temps = m.hourly.temperature.slice(0, 24).filter((v) => Number.isFinite(v));
                     const next24Precip = m.hourly.precipitation.slice(0, 24).filter((v) => Number.isFinite(v));
@@ -319,7 +331,7 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
                   })}
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-950/30 to-indigo-950/30 border border-blue-500/20 backdrop-blur-sm">
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-blue-950/30 to-indigo-950/30 border border-blue-500/20">
                   <div className="font-semibold text-blue-300 flex items-center gap-2 mb-1.5">
                     <Sparkles className="w-4 h-4 text-blue-400" />
                     <span>Acuerdo entre modelos</span>
@@ -355,7 +367,7 @@ const ForecastDrawerBase: React.FC<ForecastDrawerProps> = ({
                   </div>
                 )}
 
-                <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/30 to-teal-950/30 border border-cyan-500/20 backdrop-blur-sm">
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-cyan-950/30 to-teal-950/30 border border-cyan-500/20">
                   <div className="font-semibold text-cyan-300 flex items-center gap-2 mb-1.5">
                     <Timer className="w-4 h-4 text-cyan-400" />
                     <span>¿Qué es el nowcast?</span>

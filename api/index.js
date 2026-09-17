@@ -128,6 +128,7 @@ export default async function handler(req, res) {
     }
 
     if (pathname === '/spain-overview') {
+      res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=600');
       if (spainOverviewCache && Date.now() - spainOverviewCacheTime < CACHE_TTL) {
         return res.status(200).json(spainOverviewCache);
       }
@@ -201,6 +202,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Parámetros lat y lon numéricos requeridos' });
       }
 
+      res.setHeader('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=600');
       const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${HOURLY_VARS}&daily=${DAILY_VARS}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,weather_code&models=${FORECAST_MODELS_PARAM}&forecast_days=7&timezone=Europe%2FMadrid`;
       const omRes = await axios.get(openMeteoUrl, { timeout: 12000 });
       const omData = omRes.data;
@@ -314,6 +316,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Parámetros lat y lon numéricos requeridos' });
       }
 
+      res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=300');
       const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
       const cached = nowcastCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < NOWCAST_CACHE_TTL) {

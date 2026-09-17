@@ -24,8 +24,32 @@ export function getBadgeColor(variable: WeatherVariable, value: number): { bg: s
   return { bg: '#1e293b', text: '#94a3b8', border: '#334155' };
 }
 
+// Cache of station icons keyed by their rendered content. Regenerating the same
+// divIcon (and its HTML string) on every timeline tick is pure waste.
+const stationIconCache = new Map<string, L.DivIcon>();
+const MAX_CACHED_ICONS = 600;
+
 // Custom Station Marker HTML
 export const createStationIcon = (
+  name: string,
+  valStr: string,
+  iconStr: string,
+  colors: { bg: string; text: string; border: string },
+  isSelected: boolean
+) => {
+  const cacheKey = `${name}|${valStr}|${iconStr}|${colors.bg}|${colors.border}|${isSelected ? 1 : 0}`;
+  const cached = stationIconCache.get(cacheKey);
+  if (cached) return cached;
+  const icon = buildStationIcon(name, valStr, iconStr, colors, isSelected);
+  stationIconCache.set(cacheKey, icon);
+  if (stationIconCache.size > MAX_CACHED_ICONS) {
+    const oldest = stationIconCache.keys().next().value;
+    if (oldest !== undefined) stationIconCache.delete(oldest);
+  }
+  return icon;
+};
+
+const buildStationIcon = (
   name: string,
   valStr: string,
   iconStr: string,

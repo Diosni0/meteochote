@@ -46,11 +46,11 @@ const TimelineBarBase: React.FC<TimelineBarProps> = ({
   }
 
 return (
-    <div className="absolute bottom-4 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[680px] z-[1000] bg-gradient-to-b from-slate-900/95 to-slate-900/80 backdrop-blur-xl border border-slate-700/90 rounded-2xl shadow-2xl px-3 py-2 text-slate-100 flex flex-col gap-2 animate-fade-in">
+    <div className="absolute bottom-4 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:w-[680px] z-[1000] bg-gradient-to-b from-slate-900/95 to-slate-900/80 border border-slate-700/90 rounded-2xl shadow-2xl px-3 py-2 text-slate-100 flex flex-col gap-2 animate-fade-in">
       {/* Top Row: info + quick jumps */}
       <div className="flex items-center justify-between text-[10px] gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-mono text-blue-400 font-bold text-[11px] bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-2 py-0.5 rounded-lg border border-blue-500/20 backdrop-blur-sm">
+          <span className="font-mono text-blue-400 font-bold text-[11px] bg-gradient-to-r from-blue-500/20 to-cyan-500/20 px-2 py-0.5 rounded-lg border border-blue-500/20">
             {formattedHour}
           </span>
           <span className="hidden sm:inline text-slate-300 font-medium whitespace-nowrap">{formattedDate}</span>
@@ -101,7 +101,7 @@ return (
           </button>
         </div>
 
-        <div className={`hidden sm:block px-2 py-0.5 rounded-lg text-[10px] font-semibold backdrop-blur-sm border ${
+        <div className={`hidden sm:block px-2 py-0.5 rounded-lg text-[10px] font-semibold border ${
           offsetLabel === 'Inicio previsión'
             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
             : 'bg-blue-500/10 text-blue-400 border-blue-500/20'
@@ -115,7 +115,7 @@ return (
         {/* Play/Pause Button */}
         <button
           onClick={() => setIsPlaying(!isPlaying)}
-          className={`w-9 h-9 shrink-0 rounded-xl transition-all flex items-center justify-center backdrop-blur-sm border ${
+          className={`w-9 h-9 shrink-0 rounded-xl transition-all flex items-center justify-center border ${
             isPlaying
               ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30 border-amber-400/30'
               : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30 border-blue-400/30'
@@ -149,7 +149,7 @@ return (
               left: `calc(${((currentIndex / maxIndex) * 100)}% - 8px)`
             }}
           >
-            <div className="w-full h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full animate-pulse" />
+            <div className="w-full h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full" />
           </div>
         </div>
 

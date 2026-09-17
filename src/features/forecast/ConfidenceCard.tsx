@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Gauge, Info } from 'lucide-react';
 import { computeModelConfidence, ModelConfidence, ModelSeriesLike } from '../../lib/modelConfidence';
 import { ModelInfo, WeatherModelId } from '../../types';
@@ -70,9 +70,12 @@ const Rating: React.FC<{ label: string; range: ModelConfidence['short'] }> = ({ 
   );
 };
 
-export const ConfidenceCard: React.FC<ConfidenceCardProps> = ({ models, locationName }) => {
-  const series = Object.values(models).map((m) => m.hourly) as ModelSeriesLike[];
-  const confidence = computeModelConfidence(series);
+export const ConfidenceCardBase: React.FC<ConfidenceCardProps> = ({ models, locationName }) => {
+  // 168 hours x 4 models of spread math: only recompute when the models change.
+  const confidence = useMemo(() => {
+    const series = Object.values(models).map((m) => m.hourly) as ModelSeriesLike[];
+    return computeModelConfidence(series);
+  }, [models]);
 
   if (confidence.overall === null) {
     return (
@@ -130,3 +133,5 @@ export const ConfidenceCard: React.FC<ConfidenceCardProps> = ({ models, location
     </div>
   );
 };
+
+export const ConfidenceCard = React.memo(ConfidenceCardBase);

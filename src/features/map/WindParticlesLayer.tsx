@@ -30,6 +30,8 @@ interface WindGrid {
 
 const GRID_COLS = 64;
 const DPR_CAP = 1.5;
+const MIN_PARTICLES = 200;
+const MAX_PARTICLES = 800;
 
 export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
   data,
@@ -42,6 +44,8 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
   const animFrameRef = useRef<number | null>(null);
   const particlesRef = useRef<Particle[]>([]);
   const dataRef = useRef(data);
+  const opacityRef = useRef(opacity);
+  const densityRef = useRef(densityScale);
   const gridRef = useRef<WindGrid | null>(null);
   const gridDirtyRef = useRef(true);
   const mountedRef = useRef(true);
@@ -53,10 +57,19 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
     gridDirtyRef.current = true;
   }, [data]);
 
+  // Opacity and density are applied without restarting the animation loop.
+  useEffect(() => {
+    opacityRef.current = opacity;
+    if (canvasRef.current) canvasRef.current.style.opacity = `${opacity}`;
+  }, [opacity]);
+
+  useEffect(() => {
+    densityRef.current = densityScale;
+  }, [densityScale]);
+
   useEffect(() => {
     mountedRef.current = true;
 
-    const container = map.getContainer();
     let canvas = canvasRef.current;
 
     const clearCanvas = () => {
@@ -84,7 +97,7 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
       canvasRef.current = canvas;
     }
 
-    canvas.style.opacity = `${opacity}`;
+    canvas.style.opacity = `${opacityRef.current}`;
 
     const updateCanvasSizeAndPosition = () => {
       if (!canvas) return;
@@ -110,20 +123,39 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
 
     updateCanvasSizeAndPosition();
 
-    // Particle count scaled to screen size (between 350 and 800), reduced at overview zoom
-    const size = map.getSize();
-    const particleCount = Math.max(200, Math.min(800, Math.floor(((size.x * size.y) / 1600) * densityScale)));
+    const targetParticleCount = () => {
+      const size = map.getSize();
+      return Math.max(
+        MIN_PARTICLES,
+        Math.min(MAX_PARTICLES, Math.floor(((size.x * size.y) / 1600) * densityRef.current))
+      );
+    };
 
-    const particles: Particle[] = [];
-    for (let i = 0; i < particleCount; i++) {
-      particles.push({
-        x: Math.random() * size.x,
-        y: Math.random() * size.y,
-        age: Math.floor(Math.random() * 60),
-        maxAge: 40 + Math.floor(Math.random() * 50),
-      });
+    const spawnParticle = (size: { x: number; y: number }): Particle => ({
+      x: Math.random() * size.x,
+      y: Math.random() * size.y,
+      age: Math.floor(Math.random() * 60),
+      maxAge: 40 + Math.floor(Math.random() * 50),
+    });
+
+    // Resize the pool in place so a zoom LOD change never rebuilds the canvas.
+    const syncParticlePool = () => {
+      const size = map.getSize();
+      const target = targetParticleCount();
+      const particles = particlesRef.current;
+      if (particles.length > target) {
+        particles.length = target;
+      } else {
+        while (particles.length < target) particles.push(spawnParticle(size));
+      }
+    };
+
+    {
+      const size = map.getSize();
+      const particles: Particle[] = [];
+      for (let i = 0; i < targetParticleCount(); i++) particles.push(spawnParticle(size));
+      particlesRef.current = particles;
     }
-    particlesRef.current = particles;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -169,6 +201,7 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
       if (!isRunning || !canvas) return;
 
       if (gridDirtyRef.current || !gridRef.current) {
+        syncParticlePool();
         computeGrid();
         gridDirtyRef.current = false;
       }
@@ -258,16 +291,28 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
 
     animFrameRef.current = requestAnimationFrame(render);
 
-    const onMove = () => {
+    // The grid is a screen-space field: during a pan the old particles simply
+    // scroll with the map (cheap) and the grid is rebuilt once on settle,
+    // instead of re-running ~2.5k IDW interpolations on every move event.
+    const onMoveEnd = () => {
       updateCanvasSizeAndPosition();
       gridDirtyRef.current = true;
     };
 
+    const onZoomStart = () => {
+      if (canvas) canvas.style.visibility = 'hidden';
+    };
+
     const onZoom = () => {
+      updateCanvasSizeAndPosition();
+    };
+
+    const onZoomEnd = () => {
       updateCanvasSizeAndPosition();
       gridDirtyRef.current = true;
       if (ctx && canvas) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.style.visibility = 'visible';
       }
     };
 
@@ -288,9 +333,11 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
     };
 
     document.addEventListener('visibilitychange', onVisibility);
-    map.on('move', onMove);
+    map.on('moveend', onMoveEnd);
+    map.on('zoomstart', onZoomStart);
     map.on('zoom', onZoom);
-    map.on('resize', onMove);
+    map.on('zoomend', onZoomEnd);
+    map.on('resize', onMoveEnd);
 
     return () => {
       mountedRef.current = false;
@@ -300,16 +347,18 @@ export const WindParticlesLayer: React.FC<WindParticlesLayerProps> = ({
         animFrameRef.current = null;
       }
       document.removeEventListener('visibilitychange', onVisibility);
-      map.off('move', onMove);
+      map.off('moveend', onMoveEnd);
+      map.off('zoomstart', onZoomStart);
       map.off('zoom', onZoom);
-      map.off('resize', onMove);
+      map.off('zoomend', onZoomEnd);
+      map.off('resize', onMoveEnd);
       if (canvas && canvas.parentNode) {
         canvas.parentNode.removeChild(canvas);
         canvasRef.current = null;
       }
       gridRef.current = null;
     };
-  }, [map, visible, opacity, densityScale]);
+  }, [map, visible]);
 
   return null;
 };

@@ -3,6 +3,11 @@ import { Search, MapPin, Loader2, Navigation, X } from 'lucide-react';
 import { searchLocations } from '../services/weatherApi';
 import { LocationItem } from '../types';
 
+const isAbortError = (err: unknown): boolean => {
+  const anyErr = err as { name?: string; code?: string } | null;
+  return anyErr?.name === 'CanceledError' || anyErr?.name === 'AbortError' || anyErr?.code === 'ERR_CANCELED';
+};
+
 interface SearchBarProps {
   onSelectLocation: (loc: LocationItem) => void;
   currentLocationName: string;
@@ -31,22 +36,32 @@ const SearchBarBase: React.FC<SearchBarProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Debounced search
+  // Debounced search. Each keystroke aborts the in-flight request so a slow
+  // older response can never overwrite the results of a newer query.
   useEffect(() => {
     if (query.trim().length < 2) {
       setResults([]);
       return;
     }
 
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       setLoading(true);
-      const res = await searchLocations(query);
-      setResults(res);
-      setLoading(false);
-      setIsOpen(true);
+      try {
+        const res = await searchLocations(query, controller.signal);
+        setResults(res);
+        setIsOpen(true);
+      } catch (err) {
+        if (!isAbortError(err)) console.error('Error en la búsqueda:', err);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }, 280);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [query]);
 
   // Click outside listener

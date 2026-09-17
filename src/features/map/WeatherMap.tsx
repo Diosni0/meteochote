@@ -58,7 +58,6 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
   // Render Level of Detail: overview zoom ignores station labels and lightens the
   // overlays; the farther you zoom in, the more detail is painted.
   const detailLevel = zoom < 6.5 ? 'low' : zoom < 9 ? 'mid' : 'high';
-  const heatmapResolution = detailLevel === 'low' ? 32 : 48;
   const windDensity = detailLevel === 'low' ? 0.55 : 1;
 
   // At overview zoom keep only Valladolid and Sevilla as visual references
@@ -93,7 +92,7 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
       {/* Top Left: Basemap and Region Quick Switcher */}
       <div className="absolute top-48 lg:top-20 left-4 right-4 z-[1000] flex flex-wrap items-center gap-2 pointer-events-none">
         {/* Basemap Toggle */}
-        <div className="pointer-events-auto bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/80 shadow-lg flex items-center text-xs">
+        <div className="pointer-events-auto bg-slate-900/95 p-1 rounded-xl border border-slate-700/80 shadow-lg flex items-center text-xs">
           <button
             onClick={() => setMapTheme('dark')}
             className={`px-2.5 py-1 rounded-lg transition-colors font-medium ${
@@ -113,7 +112,7 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
         </div>
 
         {/* Region Shortcuts */}
-        <div className="pointer-events-auto flex bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/80 shadow-lg items-center text-[10px] sm:text-xs gap-1">
+        <div className="pointer-events-auto flex bg-slate-900/95 p-1 rounded-xl border border-slate-700/80 shadow-lg items-center text-[10px] sm:text-xs gap-1">
           <button
             onClick={() => onSelectCoords(40.4168, -3.7038, 'Península Ibérica')}
             className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors font-medium"
@@ -135,7 +134,7 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
         </div>
       </div>
 
-      <section aria-label="Leyenda meteorológica" className="absolute bottom-48 xl:bottom-4 left-4 right-4 sm:right-auto sm:w-64 2xl:w-80 z-[1000] bg-slate-900/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-slate-700/80 text-xs text-slate-200 shadow-xl pointer-events-none">
+      <section aria-label="Leyenda meteorológica" className="absolute bottom-48 xl:bottom-4 left-4 right-4 sm:right-auto sm:w-64 2xl:w-80 z-[1000] bg-slate-900/95 px-4 py-3 rounded-2xl border border-slate-700/80 text-xs text-slate-200 shadow-xl pointer-events-none">
         <div className="flex justify-between gap-2 font-semibold">
           <span>{scale.label}{!overlayVisible && ' (oculta)'}</span>
           <span className="text-slate-400">{scale.unit}</span>
@@ -170,6 +169,7 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
         zoom={6}
         zoomControl={false}
         scrollWheelZoom={true}
+        preferCanvas={true}
         className="w-full h-full z-10"
       >
         <ZoomControl position="topright" />
@@ -204,7 +204,7 @@ const WeatherMapBase: React.FC<WeatherMapProps> = ({
           opacity={overlayOpacity}
           visible={overlayVisible}
           activeVariable={activeVariable}
-          resolution={heatmapResolution}
+          cacheKey={`${activeModel}:${activeVariable}:${hourIndex}`}
         />
 
         {/* Animated Wind Particle Streamlines Layer (Windy style) */}

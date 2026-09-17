@@ -1,14 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { WeatherMap } from './features/map/WeatherMap';
-import { ForecastDrawer } from './features/forecast/ForecastDrawer';
 import { TimelineBar } from './features/controls/TimelineBar';
-import { ModelInfoModal } from './components/ModelInfoModal';
 import { VariableSelector } from './features/controls/VariableSelector';
 import { ModelSelector } from './features/controls/ModelSelector';
 import { LayerControlPanel } from './features/controls/LayerControlPanel';
 import { getForecast, getSpainOverview } from './services/weatherApi';
+
+// Not needed for first paint: split out of the initial bundle so the map can
+// become interactive sooner.
+const ForecastDrawer = lazy(() =>
+  import('./features/forecast/ForecastDrawer').then((m) => ({ default: m.ForecastDrawer }))
+);
+const ModelInfoModal = lazy(() =>
+  import('./components/ModelInfoModal').then((m) => ({ default: m.ModelInfoModal }))
+);
 import {
   LocationItem,
   ForecastResponse,
@@ -141,13 +148,22 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
   const handleSelectModel = useCallback((model: WeatherModelId) => setActiveModel(model), []);
   const handleOpenInfo = useCallback(() => setIsInfoOpen(true), []);
 
+  // Stable handlers so the memoized control panels only re-render on real changes.
+  const handleToggleRadar = useCallback(() => setShowRadar(prev => !prev), []);
+  const handleToggleLayerControl = useCallback(() => setShowLayerControl(prev => !prev), []);
+  const handleToggleOverlay = useCallback(() => setOverlayVisible(prev => !prev), []);
+  const handleToggleStations = useCallback(() => setShowStations(prev => !prev), []);
+  const handleToggleWind = useCallback(() => setShowWindParticles(prev => !prev), []);
+  const handleOpenDrawer = useCallback(() => setIsDrawerOpen(true), []);
+
   return (
     <div className="h-dvh w-full bg-slate-950 text-slate-100 flex flex-col overflow-hidden select-none relative">
-      {/* Background gradient effects */}
+      {/* Background gradient effects. Kept as static gradients (no infinite
+          blur animation) so the compositor never repaints the map behind them. */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-3xl animate-float" />
-        <div className="absolute top-1/2 -left-40 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-        <div className="absolute -bottom-40 right-20 w-[550px] h-[550px] bg-cyan-600/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }} />
+        <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(37,99,235,0.10),transparent_70%)]" />
+        <div className="absolute top-1/2 -left-40 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(79,70,229,0.10),transparent_70%)]" />
+        <div className="absolute -bottom-40 right-20 w-[550px] h-[550px] rounded-full bg-[radial-gradient(circle,rgba(8,145,178,0.10),transparent_70%)]" />
       </div>
 
       {/* Top Header */}
@@ -162,22 +178,22 @@ const [overlayOpacity, setOverlayOpacity] = useState<number>(0.65);
             activeVariable={activeVariable}
             onSelectVariable={handleSelectVariable}
             showRadar={showRadar}
-            onToggleRadar={() => setShowRadar(prev => !prev)}
+            onToggleRadar={handleToggleRadar}
             showLayerControl={showLayerControl}
-            onToggleLayerControl={() => setShowLayerControl(prev => !prev)}
+            onToggleLayerControl={handleToggleLayerControl}
           />
 
           {/* Layer Control Panel (visible on toggle) */}
           {showLayerControl && (
             <LayerControlPanel
               overlayVisible={overlayVisible}
-              onToggleOverlay={() => setOverlayVisible(prev => !prev)}
+              onToggleOverlay={handleToggleOverlay}
               overlayOpacity={overlayOpacity}
               onOverlayOpacityChange={setOverlayOpacity}
               showStations={showStations}
-              onToggleStations={() => setShowStations(prev => !prev)}
+              onToggleStations={handleToggleStations}
               showWindParticles={showWindParticles}
-              onToggleWind={() => setShowWindParticles(prev => !prev)}
+              onToggleWind={handleToggleWind}
             />
           )}
 
@@ -220,22 +236,24 @@ overlayOpacity={overlayOpacity}
           onIndexChange={setCurrentHourIndex}
         />
 
-        {/* Floating Forecast Drawer (Right Side) */}
-<ForecastDrawer
-          isOpen={isDrawerOpen}
-          onClose={handleCloseDrawer}
-          location={currentLocation}
-          forecastData={forecastData}
-          loading={loadingForecast}
-          activeModel={activeModel}
-          onSelectModel={handleSelectModel}
-        />
+{/* Floating Forecast Drawer (Right Side) */}
+        <Suspense fallback={null}>
+          <ForecastDrawer
+            isOpen={isDrawerOpen}
+            onClose={handleCloseDrawer}
+            location={currentLocation}
+            forecastData={forecastData}
+            loading={loadingForecast}
+            activeModel={activeModel}
+            onSelectModel={handleSelectModel}
+          />
+        </Suspense>
 
 {/* Reopen Drawer Pill (only after the user picks a location) */}
         {!isDrawerOpen && hasSelectedLocation && (
-          <button
-            onClick={() => setIsDrawerOpen(true)}
-            className="absolute top-64 lg:top-36 left-4 lg:left-auto lg:right-4 max-w-[calc(100%-5rem)] z-[1000] bg-slate-900/95 backdrop-blur-xl px-4 py-2.5 rounded-2xl border border-slate-700/80 shadow-2xl text-xs font-bold text-white hover:bg-blue-600 transition-all flex items-center gap-2"
+<button
+            onClick={handleOpenDrawer}
+            className="absolute top-64 lg:top-36 left-4 lg:left-auto lg:right-4 max-w-[calc(100%-5rem)] z-[1000] bg-slate-900/95 px-4 py-2.5 rounded-2xl border border-slate-700/80 shadow-2xl text-xs font-bold text-white hover:bg-blue-600 transition-all flex items-center gap-2"
           >
             <Calendar className="w-4 h-4 shrink-0 text-blue-400" />
             <span className="truncate">Previsión 7 Días ({currentLocation.name})</span>
@@ -244,7 +262,9 @@ overlayOpacity={overlayOpacity}
       </div>
 
       {/* Modals */}
-      <ModelInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
+      <Suspense fallback={null}>
+        <ModelInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
+      </Suspense>
     </div>
   );
 };

@@ -24,7 +24,7 @@ export const LayerControlPanel: React.FC<LayerControlPanelProps> = ({
 }) => {
   return (
     <div id="map-layer-controls" role="region" aria-labelledby="map-layer-title" className="absolute top-12 lg:top-16 left-0 z-[1001] w-full max-w-[320px] pointer-events-auto">
-      <div className="bg-slate-900/98 backdrop-blur-xl p-4 rounded-2xl border border-slate-700/80 shadow-2xl">
+      <div className="bg-slate-900/98 p-4 rounded-2xl border border-slate-700/80 shadow-2xl">
         <div className="flex items-center justify-between mb-3">
           <h3 id="map-layer-title" className="text-xs font-bold text-white flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-blue-400" />

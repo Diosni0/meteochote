@@ -326,11 +326,11 @@ export const getNowcast = async (lat: number, lon: number): Promise<NowcastData>
 };
 
 // Direct client fallback for location search
-export const searchLocationsDirect = async (query: string): Promise<LocationItem[]> => {
+export const searchLocationsDirect = async (query: string, signal?: AbortSignal): Promise<LocationItem[]> => {
   if (!query || query.trim().length < 2) return [];
   try {
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query.trim())}&count=12&language=es&format=json`;
-    const response = await axios.get(url, { timeout: 6000 });
+    const response = await axios.get(url, { timeout: 6000, signal });
     const rawResults = response.data?.results || [];
 
     const spainResults = rawResults.filter((item: any) => item.country_code === 'ES');
@@ -349,25 +349,29 @@ export const searchLocationsDirect = async (query: string): Promise<LocationItem
       timezone: item.timezone || 'Europe/Madrid',
     }));
   } catch (err) {
+    if (axios.isCancel(err)) throw err;
     console.error('Direct geocoding error:', err);
     return [];
   }
 };
 
-export const searchLocations = async (query: string): Promise<LocationItem[]> => {
+export const searchLocations = async (query: string, signal?: AbortSignal): Promise<LocationItem[]> => {
   if (!query || query.trim().length < 2) return [];
   try {
     const response = await axios.get(`${API_BASE}/search`, {
       params: { q: query.trim() },
       timeout: 4000,
+      signal,
     });
     if (response.data?.results?.length) {
       return response.data.results;
     }
   } catch (error) {
+    // Cancelled by a newer keystroke: let the caller discard this result.
+    if (axios.isCancel(error)) throw error;
     // Backend unavailable or 404 (e.g. on static deployments) -> Fallback directly
   }
-  return searchLocationsDirect(query);
+  return searchLocationsDirect(query, signal);
 };
 
 export const getWeatherDescription = (code: number): { text: string; icon: string } => {

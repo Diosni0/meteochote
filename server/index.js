@@ -137,6 +137,9 @@ app.get('/api/health', (req, res) => {
 
 // Spain overview for the map: one batched request for all stations
 app.get('/api/spain-overview', async (req, res) => {
+  // Let the CDN/browser reuse the (expensive, 20+ upstream call) aggregate.
+  res.set('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=600');
+
   if (spainOverviewCache && (Date.now() - spainOverviewCacheTime < CACHE_TTL)) {
     return res.json(spainOverviewCache);
   }
@@ -215,6 +218,8 @@ app.get('/api/forecast', async (req, res) => {
   if (isNaN(lat) || isNaN(lon)) {
     return res.status(400).json({ error: 'Parámetros de latitud y longitud requeridos y numéricos' });
   }
+
+  res.set('Cache-Control', 'public, s-maxage=900, stale-while-revalidate=600');
 
   const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
   const cached = weatherCache.get(cacheKey);
@@ -343,6 +348,9 @@ app.get('/api/nowcast', async (req, res) => {
   if (isNaN(lat) || isNaN(lon)) {
     return res.status(400).json({ error: 'Parámetros de latitud y longitud requeridos y numéricos' });
   }
+
+  // Short-lived: nowcast refreshes upstream ~every 10 minutes.
+  res.set('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=300');
 
   const cacheKey = `${lat.toFixed(2)}_${lon.toFixed(2)}`;
   const cached = nowcastCache.get(cacheKey);

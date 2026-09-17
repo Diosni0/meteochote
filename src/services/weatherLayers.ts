@@ -48,7 +48,7 @@ const MAX_INTERPOLATION_RADIUS_KM = 300;
 
 // Bounded inverse-distance interpolation: blends smoothly across the mainland and islands
 // without creating artifacts over long oceanic gaps.
-export function interpolateWeather(points: HeatmapPoint[], lat: number, lon: number) {
+export function interpolateWeather(points: readonly HeatmapPoint[], lat: number, lon: number) {
   let sum = 0;
   let weights = 0;
   let nearest = Infinity;

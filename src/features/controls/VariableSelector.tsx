@@ -20,7 +20,7 @@ export const VariableSelector: React.FC<VariableSelectorProps> = ({
   onToggleLayerControl,
 }) => {
   return (
-    <div className="pointer-events-auto w-full lg:w-auto lg:shrink-0 min-w-0 bg-slate-900/90 backdrop-blur-xl p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl flex items-center justify-between gap-1">
+    <div className="pointer-events-auto w-full lg:w-auto lg:shrink-0 min-w-0 bg-slate-900/95 p-1.5 rounded-2xl border border-slate-700/80 shadow-2xl flex items-center justify-between gap-1">
       <button
         onClick={() => onSelectVariable('temperature')}
         aria-pressed={activeVariable === 'temperature'}
